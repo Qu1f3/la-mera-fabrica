@@ -1,0 +1,275 @@
+// Esquema de base de datos — La Mera Fábrica
+//
+// Convención deliberada: los modelos y campos usan nombres en español para que
+// coincidan con el dominio del negocio y con el documento de Fase 0 (ver
+// propuesta-la-mera-fabrica.md). El resto del código (funciones, componentes,
+// variables) usa convención en inglés, como es estándar en el ecosistema.
+//
+// Decisiones clave de este modelo (ver Fase 0, sección 9):
+// - `Producto` es una sola tabla para mosaicos y molduras, con `tipo` como
+//   discriminante. Los atributos que comparten (estilo, acabado, color,
+//   aplicación) son columnas propias; lo que difiere por tipo (dimensiones de
+//   pieza, cobertura por caja, longitud por pieza, etc.) vive en el campo
+//   `especificaciones` (JSON), para no forzar un esquema rígido ni migrar la
+//   base de datos cada vez que aparece un atributo técnico nuevo.
+// - `ProductoRelacionado` distingue "moldura a juego" (complementario) de
+//   "también te puede interesar" (similar) — es una relación con significado,
+//   no un campo de texto libre.
+// - No existe un campo de precio público. `Configuracion` es una fila única
+//   editable desde el panel con los datos del negocio (WhatsApp, horario,
+//   dirección, redes) — nunca hardcodeados en el código.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Catálogo
+// ---------------------------------------------------------------------------
+
+enum TipoProducto {
+  MOSAICO
+  MOLDURA
+}
+
+enum Disponibilidad {
+  DISPONIBLE
+  BAJO_PEDIDO
+  AGOTADO
+  DESCONTINUADO
+}
+
+enum TipoRelacion {
+  COMPLEMENTARIO // ej: la moldura a juego de un mosaico
+  SIMILAR // ej: otro producto parecido en estilo
+}
+
+model Categoria {
+  id            String     @id @default(cuid())
+  nombre        String
+  slug          String     @unique
+  descripcion   String?
+  orden         Int        @default(0)
+  activo        Boolean    @default(true)
+  productos     Producto[]
+  creadoEn      DateTime   @default(now())
+  actualizadoEn DateTime   @updatedAt
+
+  @@map("categorias")
+}
+
+model Producto {
+  id             String         @id @default(cuid())
+  sku            String?        @unique
+  nombre         String
+  slug           String         @unique
+  tipo           TipoProducto
+  descripcion    String?
+  categoriaId    String?
+  categoria      Categoria?     @relation(fields: [categoriaId], references: [id])
+  estilo         String?
+  acabado        String?
+  colores        String[]       @default([])
+  aplicaciones   String[]       @default([])
+  disponibilidad Disponibilidad @default(DISPONIBLE)
+  destacado      Boolean        @default(false)
+  activo         Boolean        @default(true)
+
+  // Datos técnicos específicos por tipo (dimensiones de pieza, cobertura por
+  // caja para mosaico; longitud de pieza y perfil para moldura, etc.).
+  // Estructura sugerida, no forzada por el esquema:
+  //   mosaico: { largoCm, anchoCm, espesorMm, coberturaCajaM2, piezasPorCaja }
+  //   moldura: { longitudPiezaCm, perfilMm, altoMm }
+  especificaciones Json?
+
+  imagenes ImagenProducto[]
+
+  relacionadoDesde ProductoRelacionado[] @relation("ProductoOrigen")
+  relacionadoHacia ProductoRelacionado[] @relation("ProductoDestino")
+
+  itemsCotizacion ItemCotizacion[]
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([categoriaId])
+  @@map("productos")
+}
+
+model ImagenProducto {
+  id         String   @id @default(cuid())
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  url        String
+  alt        String?
+  orden      Int      @default(0)
+  creadoEn   DateTime @default(now())
+
+  @@index([productoId])
+  @@map("imagenes_producto")
+}
+
+// Relación dirigida producto -> relacionado, con el tipo de relación.
+// Se guarda en un solo sentido; la UI decide si la muestra también en el
+// producto destino (normalmente sí, para "moldura a juego" recíproca).
+model ProductoRelacionado {
+  id            String       @id @default(cuid())
+  productoId    String
+  producto      Producto     @relation("ProductoOrigen", fields: [productoId], references: [id], onDelete: Cascade)
+  relacionadoId String
+  relacionado   Producto     @relation("ProductoDestino", fields: [relacionadoId], references: [id], onDelete: Cascade)
+  tipoRelacion  TipoRelacion
+
+  @@unique([productoId, relacionadoId])
+  @@map("productos_relacionados")
+}
+
+// ---------------------------------------------------------------------------
+// Cotización
+// ---------------------------------------------------------------------------
+
+enum EstadoCotizacion {
+  NUEVA
+  CONTACTADO
+  CERRADA
+}
+
+enum UnidadCotizacion {
+  M2 // mosaico: metros cuadrados
+  ML // moldura: metros lineales
+}
+
+model SolicitudCotizacion {
+  id            String           @id @default(cuid())
+  nombreCliente String
+  telefono      String
+  email         String?
+  notas         String?
+  estado        EstadoCotizacion @default(NUEVA)
+  items         ItemCotizacion[]
+  creadoEn      DateTime         @default(now())
+  actualizadoEn DateTime         @updatedAt
+
+  @@index([estado])
+  @@map("solicitudes_cotizacion")
+}
+
+model ItemCotizacion {
+  id          String              @id @default(cuid())
+  solicitudId String
+  solicitud   SolicitudCotizacion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  productoId  String
+  producto    Producto            @relation(fields: [productoId], references: [id])
+  // Opcional a propósito: un cliente puede no saber cuántos m²/ml necesita
+  // todavía y aun así querer que le cotices el producto (ver Fase 3).
+  cantidad    Decimal?            @db.Decimal(10, 2)
+  unidad      UnidadCotizacion
+  notas       String?
+
+  @@index([solicitudId])
+  @@map("items_cotizacion")
+}
+
+// ---------------------------------------------------------------------------
+// Contenido editable desde el panel
+// ---------------------------------------------------------------------------
+
+model Banner {
+  id          String    @id @default(cuid())
+  titulo      String
+  subtitulo   String?
+  imagenUrl   String?
+  enlace      String?
+  orden       Int       @default(0)
+  activo      Boolean   @default(true)
+  fechaInicio DateTime?
+  fechaFin    DateTime?
+  creadoEn    DateTime  @default(now())
+
+  @@map("banners")
+}
+
+// Bloques de contenido de secciones fijas del sitio (ej: "nosotros",
+// "historia"). `clave` identifica la sección; el contenido real se llena
+// desde el panel cuando exista información real del negocio.
+model SeccionContenido {
+  id            String   @id @default(cuid())
+  clave         String   @unique
+  titulo        String
+  cuerpo        String?
+  imagenUrl     String?
+  actualizadoEn DateTime @updatedAt
+
+  @@map("secciones_contenido")
+}
+
+model Faq {
+  id        String  @id @default(cuid())
+  pregunta  String
+  respuesta String
+  orden     Int     @default(0)
+  activo    Boolean @default(true)
+
+  @@map("faqs")
+}
+
+// Solo testimonios reales, cargados por el administrador. Si no hay ninguno
+// activo, la sección correspondiente del sitio simplemente no se muestra.
+model Testimonio {
+  id            String   @id @default(cuid())
+  nombreCliente String
+  texto         String
+  calificacion  Int?
+  fotoUrl       String?
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+
+  @@map("testimonios")
+}
+
+// Fila única con los datos reales del negocio. Se edita desde el panel;
+// mientras no exista información real, estos campos quedan en null y el
+// sitio lo trata como estado pendiente, no como dato inventado.
+model Configuracion {
+  id                String   @id @default("global")
+  whatsappNumero    String?
+  horarioAtencion   String?
+  direccion         String?
+  mapaUrl           String?
+  facebookUrl       String?
+  instagramUrl      String?
+  actualizadoEn     DateTime @updatedAt
+
+  @@map("configuracion")
+}
+
+// ---------------------------------------------------------------------------
+// Administración
+// ---------------------------------------------------------------------------
+
+enum RolAdmin {
+  ADMIN
+}
+
+// Perfil de aplicación para cada usuario de Supabase Auth con acceso al
+// panel. Hoy solo existe el rol ADMIN; el campo ya está listo para cuando
+// haga falta un segundo rol, sin tener que rediseñar la autenticación.
+// No es obligatorio para iniciar sesión en la Fase 1 (ver src/lib/supabase/proxy.ts).
+model AdminUsuario {
+  id         String   @id @default(cuid())
+  authUserId String   @unique
+  nombre     String
+  email      String   @unique
+  rol        RolAdmin @default(ADMIN)
+  activo     Boolean  @default(true)
+  creadoEn   DateTime @default(now())
+
+  @@map("admin_usuarios")
+}
