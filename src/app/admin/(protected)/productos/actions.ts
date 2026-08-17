@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { subirImagenProducto, borrarImagenProducto } from "@/lib/storage";
@@ -83,7 +84,13 @@ function datosBase(formData: FormData) {
     ) as Disponibilidad,
     destacado: formData.get("destacado") === "on",
     activo: formData.get("activo") === "on",
-    especificaciones: armarEspecificaciones(tipo, formData),
+    // Prisma distingue explícitamente entre "sin valor" (undefined, el campo
+    // no se toca) y "valor NULL en la base de datos" para columnas JSON — un
+    // `null` de JavaScript normal ya no es válido ahí, hay que usar el
+    // marcador `Prisma.DbNull`. Esto es invisible en el sandbox de Cowork
+    // (nunca genera el cliente real de Prisma), solo lo detecta un build de
+    // verdad como el de Vercel.
+    especificaciones: armarEspecificaciones(tipo, formData) ?? Prisma.DbNull,
   };
 }
 
