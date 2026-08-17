@@ -33,14 +33,14 @@ export default async function ProtectedAdminLayout({
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Image
             src="/logo-emblema.png"
             alt=""
             width={32}
             height={32}
-            className="h-8 w-8"
+            className="h-8 w-8 flex-shrink-0"
             priority
           />
           <div>
@@ -50,8 +50,10 @@ export default async function ProtectedAdminLayout({
             <p className="text-xs text-neutral-500">Panel administrativo</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-neutral-600">{user.email}</span>
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className="hidden max-w-[160px] truncate text-sm text-neutral-600 sm:inline">
+            {user.email}
+          </span>
           <form action={signOut}>
             <button
               type="submit"
@@ -62,8 +64,14 @@ export default async function ProtectedAdminLayout({
           </form>
         </div>
       </header>
-      <nav className="border-b border-neutral-200 bg-white px-6">
-        <div className="mx-auto flex max-w-5xl gap-5">
+      {/*
+        overflow-x-auto + whitespace-nowrap: en un teléfono estos 6 enlaces
+        no caben en una sola fila — en vez de romper el layout (desbordando
+        toda la página hacia los lados) o esconder alguno, esta franja se
+        desliza horizontalmente sola, sin afectar el resto de la página.
+      */}
+      <nav className="overflow-x-auto border-b border-neutral-200 bg-white px-4 sm:px-6">
+        <div className="mx-auto flex max-w-5xl gap-5 whitespace-nowrap">
           {ENLACES_NAV.map((enlace) => (
             <Link
               key={enlace.href}
@@ -75,7 +83,7 @@ export default async function ProtectedAdminLayout({
           ))}
         </div>
       </nav>
-      <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">{children}</main>
     </div>
   );
 }

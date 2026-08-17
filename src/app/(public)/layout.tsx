@@ -4,6 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { WhatsAppButton } from "@/components/catalogo/WhatsAppButton";
 import { CartIndicator } from "@/components/catalogo/CartIndicator";
+import { MobileNav } from "@/components/layout/MobileNav";
 import { construirLocalBusiness, jsonLdSeguro } from "@/lib/structured-data";
 
 const ENLACES_NAV = [
@@ -34,7 +35,7 @@ export default async function PublicLayout({
           __html: jsonLdSeguro(construirLocalBusiness(config)),
         }}
       />
-      <header className="border-b border-neutral-200 bg-white">
+      <header className="relative border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
           <Link
             href="/"
@@ -50,7 +51,7 @@ export default async function PublicLayout({
             />
             La Mera Fábrica
           </Link>
-          <nav className="flex items-center gap-6 text-sm font-medium text-piedra">
+          <nav className="flex items-center gap-4 text-sm font-medium text-piedra sm:gap-6">
             <div className="hidden gap-6 sm:flex">
               {ENLACES_NAV.map((enlace) => (
                 <Link
@@ -63,6 +64,7 @@ export default async function PublicLayout({
               ))}
             </div>
             <CartIndicator />
+            <MobileNav enlaces={ENLACES_NAV} />
           </nav>
         </div>
       </header>
