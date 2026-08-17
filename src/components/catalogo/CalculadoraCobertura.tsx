@@ -7,6 +7,14 @@ type Fila = { largo: string; ancho: string };
 
 const MERMA_SUGERIDA = "10";
 
+// Dato real del negocio (no inventado): sus mosaicos rinden 16 piezas por
+// m². Es el mismo tamaño de pieza en todo el catálogo, así que este número
+// es válido para cualquier producto de tipo MOSAICO — si en el futuro el
+// negocio vende un mosaico de otro tamaño, este valor dejaría de ser
+// universal y habría que sacarlo de las especificaciones de cada producto
+// en vez de un solo número fijo aquí.
+const MOSAICOS_POR_M2 = 16;
+
 /**
  * Ayuda al cliente a calcular cuántos m²/ml necesita a partir de las
  * medidas reales del espacio, en vez de dejarlo adivinar un número — nace
@@ -51,6 +59,13 @@ export function CalculadoraCobertura({
   // Redondeado hacia arriba al siguiente 0.5, para que combine con el step
   // de los campos de cantidad del resto del sitio.
   const totalRedondeado = Math.ceil(totalConMerma * 2) / 2;
+  // Cuántas piezas de mosaico comprar, no solo cuántos m² — muchos clientes
+  // no saben convertir uno al otro. Solo aplica a mosaico: una moldura se
+  // vende por longitud (ml), no por pieza sobre un área.
+  const unidadesEstimadas =
+    esMosaico && totalRedondeado > 0
+      ? Math.ceil(totalRedondeado * MOSAICOS_POR_M2)
+      : null;
 
   function actualizarFila(indice: number, campo: keyof Fila, valor: string) {
     setFilas((previas) =>
@@ -175,6 +190,16 @@ export function CalculadoraCobertura({
             merma || 0
           }% de margen)`}
       </p>
+
+      {unidadesEstimadas !== null && (
+        <p className="mt-1 text-xs text-piedra">
+          Eso son aproximadamente{" "}
+          <span className="font-semibold text-carbon">
+            {unidadesEstimadas} mosaicos
+          </span>{" "}
+          (a {MOSAICOS_POR_M2} piezas por m²).
+        </p>
+      )}
 
       <div className="mt-3 flex gap-3">
         <button
