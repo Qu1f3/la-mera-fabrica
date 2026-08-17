@@ -2,18 +2,11 @@
 
 import { useState } from "react";
 import type { TipoProducto } from "@/lib/types";
+import { MOSAICOS_POR_M2, piezasDeMosaico } from "@/lib/cobertura";
 
 type Fila = { largo: string; ancho: string };
 
 const MERMA_SUGERIDA = "10";
-
-// Dato real del negocio (no inventado): sus mosaicos rinden 16 piezas por
-// m². Es el mismo tamaño de pieza en todo el catálogo, así que este número
-// es válido para cualquier producto de tipo MOSAICO — si en el futuro el
-// negocio vende un mosaico de otro tamaño, este valor dejaría de ser
-// universal y habría que sacarlo de las especificaciones de cada producto
-// en vez de un solo número fijo aquí.
-const MOSAICOS_POR_M2 = 16;
 
 /**
  * Ayuda al cliente a calcular cuántos m²/ml necesita a partir de las
@@ -64,7 +57,7 @@ export function CalculadoraCobertura({
   // vende por longitud (ml), no por pieza sobre un área.
   const unidadesEstimadas =
     esMosaico && totalRedondeado > 0
-      ? Math.ceil(totalRedondeado * MOSAICOS_POR_M2)
+      ? piezasDeMosaico(totalRedondeado)
       : null;
 
   function actualizarFila(indice: number, campo: keyof Fila, valor: string) {

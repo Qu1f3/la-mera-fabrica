@@ -1,4 +1,5 @@
 import { ETIQUETA_UNIDAD, type UnidadCotizacion } from "@/lib/types";
+import { piezasDeMosaico } from "@/lib/cobertura";
 
 /**
  * Arma un enlace wa.me con el mensaje ya escrito, para que el cliente no
@@ -44,11 +45,17 @@ export function mensajeSolicitudCotizacion(datos: {
   }[];
 }): string {
   const lista = datos.items
-    .map((item) =>
-      item.cantidad != null
-        ? `- ${item.nombre}: ${item.cantidad} ${ETIQUETA_UNIDAD[item.unidad]}`
-        : `- ${item.nombre}: cantidad por confirmar`
-    )
+    .map((item) => {
+      if (item.cantidad == null) return `- ${item.nombre}: cantidad por confirmar`;
+
+      const base = `- ${item.nombre}: ${item.cantidad} ${ETIQUETA_UNIDAD[item.unidad]}`;
+      // La cantidad de mosaico se guarda en m² — se agrega la conversión a
+      // piezas (ver src/lib/cobertura.ts) para que la cotización llegue
+      // lista para despachar, sin que el negocio tenga que volver a
+      // calcularlo del lado de acá.
+      if (item.unidad !== "M2") return base;
+      return `${base} (≈ ${piezasDeMosaico(item.cantidad)} piezas)`;
+    })
     .join("\n");
 
   return `Hola, soy ${datos.nombreCliente}. Quisiera una cotización de:\n${lista}\n\nVi los productos en el sitio de La Mera Fábrica.`;

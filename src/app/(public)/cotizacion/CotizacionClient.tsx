@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useCart } from "@/lib/cart/CartContext";
 import { ETIQUETA_UNIDAD } from "@/lib/types";
+import { piezasDeMosaico } from "@/lib/cobertura";
 import { trackEvent } from "@/lib/analytics";
 import { crearSolicitudCotizacion } from "./actions";
 
@@ -79,12 +80,19 @@ export function CotizacionClient() {
       <ul className="mt-6 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
         {items.map((item) => (
           <li key={item.productoId} className="flex items-center gap-3 p-4">
-            <Link
-              href={`/productos/${item.slug}`}
-              className="flex-1 text-sm font-medium text-carbon hover:underline"
-            >
-              {item.nombre}
-            </Link>
+            <div className="flex-1">
+              <Link
+                href={`/productos/${item.slug}`}
+                className="text-sm font-medium text-carbon hover:underline"
+              >
+                {item.nombre}
+              </Link>
+              {item.unidad === "M2" && item.cantidad != null && (
+                <p className="text-xs text-piedra">
+                  ≈ {piezasDeMosaico(item.cantidad)} piezas
+                </p>
+              )}
+            </div>
             <input
               type="number"
               min={0.5}
