@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { SubirFotosProducto } from "@/components/admin/SubirFotosProducto";
 import { ETIQUETA_TIPO } from "@/lib/types";
 import type {
   EspecificacionesMoldura,
@@ -15,7 +16,6 @@ import {
   borrarImagen,
   eliminarProducto,
   quitarRelacionado,
-  subirImagenesProducto,
 } from "../actions";
 
 const inputClass =
@@ -145,24 +145,7 @@ export default async function EditarProductoPage({
           </ul>
         )}
 
-        <form
-          action={subirImagenesProducto.bind(null, producto.id)}
-          className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-4"
-        >
-          <input
-            type="file"
-            name="imagenes"
-            accept="image/png,image/jpeg,image/webp"
-            multiple
-            className="text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            Subir fotos
-          </button>
-        </form>
+        <SubirFotosProducto productoId={producto.id} />
       </section>
 
       <section className="mt-10 border-t border-neutral-200 pt-8">

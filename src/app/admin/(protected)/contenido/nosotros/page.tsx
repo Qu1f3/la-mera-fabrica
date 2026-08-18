@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { SubirImagenUnica } from "@/components/admin/SubirImagenUnica";
 import {
   actualizarNosotros,
   borrarImagenNosotros,
@@ -94,23 +95,10 @@ export default async function NosotrosPage() {
           </p>
         )}
 
-        <form
-          action={subirImagenNosotros}
-          className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-4"
-        >
-          <input
-            type="file"
-            name="imagen"
-            accept="image/png,image/jpeg,image/webp"
-            className="text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            {seccion?.imagenUrl ? "Reemplazar imagen" : "Subir imagen"}
-          </button>
-        </form>
+        <SubirImagenUnica
+          accion={subirImagenNosotros}
+          textoBoton={seccion?.imagenUrl ? "Reemplazar imagen" : "Subir imagen"}
+        />
       </section>
     </div>
   );

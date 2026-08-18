@@ -2,6 +2,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
+import { SubirImagenUnica } from "@/components/admin/SubirImagenUnica";
 import {
   actualizarBanner,
   borrarImagenBanner,
@@ -165,23 +166,10 @@ export default async function EditarBannerPage({
           </p>
         )}
 
-        <form
-          action={subirImagenBanner.bind(null, banner.id)}
-          className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-4"
-        >
-          <input
-            type="file"
-            name="imagen"
-            accept="image/png,image/jpeg,image/webp"
-            className="text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            {banner.imagenUrl ? "Reemplazar imagen" : "Subir imagen"}
-          </button>
-        </form>
+        <SubirImagenUnica
+          accion={subirImagenBanner.bind(null, banner.id)}
+          textoBoton={banner.imagenUrl ? "Reemplazar imagen" : "Subir imagen"}
+        />
       </section>
 
       <section className="mt-8 rounded-lg border border-neutral-200 bg-white p-6">
