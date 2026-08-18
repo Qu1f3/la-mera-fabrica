@@ -154,7 +154,9 @@ export default async function ProductoDetallePage({
             <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
               {producto.estilo && (
                 <div>
-                  <dt className="text-piedra">Estilo</dt>
+                  <dt className="text-piedra">
+                    {producto.tipo === "MOSAICO" ? "Diseño" : "Estilo"}
+                  </dt>
                   <dd className="text-carbon">{producto.estilo}</dd>
                 </div>
               )}

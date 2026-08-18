@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { ProductoFormState } from "./actions";
+import { disenosPermitidos } from "@/lib/disenoMosaico";
 import type {
   Disponibilidad,
   EspecificacionesMoldura,
@@ -64,6 +65,38 @@ export function ProductoForm({
   const valores = valoresIniciales ?? VALORES_VACIOS;
   const [state, formAction, pending] = useActionState(action, {});
   const [tipo, setTipo] = useState<TipoProducto>(valores.tipo);
+  const [categoriaId, setCategoriaId] = useState(valores.categoriaId ?? "");
+  const [estilo, setEstilo] = useState(valores.estilo ?? "");
+
+  // Ver src/lib/disenoMosaico.ts: para mosaico, "estilo" pasó de texto libre
+  // a un diseño de un catálogo fijo, y los diseños válidos dependen de la
+  // categoría elegida ("Acera" no admite "Espiral"). Si el usuario cambia de
+  // categoría y el diseño que tenía seleccionado ya no es válido ahí, se
+  // limpia — mejor eso que dejar guardada una combinación que no existe en
+  // el negocio real.
+  const nombreCategoria = categorias.find((c) => c.id === categoriaId)?.nombre;
+  const opcionesDiseno = disenosPermitidos(nombreCategoria);
+
+  function manejarCambioCategoria(nuevoId: string) {
+    setCategoriaId(nuevoId);
+    const nuevoNombre = categorias.find((c) => c.id === nuevoId)?.nombre;
+    if (!(disenosPermitidos(nuevoNombre) as readonly string[]).includes(estilo)) {
+      setEstilo("");
+    }
+  }
+
+  function manejarCambioTipo(nuevoTipo: TipoProducto) {
+    setTipo(nuevoTipo);
+    // Al pasar a Mosaico, el texto libre de "Estilo" (moldura) casi nunca
+    // coincide con el catálogo fijo de diseños — se limpia para no dejar
+    // guardado un valor que no es un diseño real.
+    if (
+      nuevoTipo === "MOSAICO" &&
+      !(opcionesDiseno as readonly string[]).includes(estilo)
+    ) {
+      setEstilo("");
+    }
+  }
 
   const specMosaico = (
     valores.tipo === "MOSAICO" ? valores.especificaciones : null
@@ -121,7 +154,7 @@ export function ProductoForm({
             id="tipo"
             name="tipo"
             value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoProducto)}
+            onChange={(e) => manejarCambioTipo(e.target.value as TipoProducto)}
             className={inputClass}
           >
             <option value="MOSAICO">Mosaico</option>
@@ -136,7 +169,8 @@ export function ProductoForm({
           <select
             id="categoriaId"
             name="categoriaId"
-            defaultValue={valores.categoriaId ?? ""}
+            value={categoriaId}
+            onChange={(e) => manejarCambioCategoria(e.target.value)}
             className={inputClass}
           >
             <option value="">Sin categoría</option>
@@ -163,15 +197,33 @@ export function ProductoForm({
 
         <div className="space-y-1">
           <label htmlFor="estilo" className={labelClass}>
-            Estilo
+            {tipo === "MOSAICO" ? "Diseño" : "Estilo"}
           </label>
-          <input
-            id="estilo"
-            name="estilo"
-            defaultValue={valores.estilo ?? ""}
-            placeholder="Ej: Rústico, Moderno"
-            className={inputClass}
-          />
+          {tipo === "MOSAICO" ? (
+            <select
+              id="estilo"
+              name="estilo"
+              value={estilo}
+              onChange={(e) => setEstilo(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Sin diseño</option>
+              {opcionesDiseno.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              id="estilo"
+              name="estilo"
+              value={estilo}
+              onChange={(e) => setEstilo(e.target.value)}
+              placeholder="Ej: Rústico, Moderno"
+              className={inputClass}
+            />
+          )}
         </div>
 
         <div className="space-y-1">

@@ -84,7 +84,7 @@ export function FilterBar({
       {estilos.length > 0 && (
         <div className="flex flex-col gap-1">
           <label htmlFor="estilo" className="text-xs font-medium text-piedra">
-            Estilo
+            Diseño
           </label>
           <select
             id="estilo"
