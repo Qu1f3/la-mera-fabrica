@@ -42,13 +42,29 @@ export function mensajeSolicitudCotizacion(datos: {
     nombre: string;
     cantidad: number | null;
     unidad: UnidadCotizacion;
+    categoria: string | null;
+    diseno: string | null;
   }[];
 }): string {
   const lista = datos.items
     .map((item) => {
-      if (item.cantidad == null) return `- ${item.nombre}: cantidad por confirmar`;
+      // Categoría y diseño (ver src/lib/disenoMosaico.ts) entre paréntesis
+      // después del nombre, para que la cotización llegue con más detalle
+      // del producto y el negocio no tenga que ir a buscarlo — solo
+      // aparecen si el producto los tiene (moldura no tiene diseño).
+      const detalle = [
+        item.categoria ? `Categoría: ${item.categoria}` : null,
+        item.diseno ? `Diseño: ${item.diseno}` : null,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const nombreConDetalle = detalle ? `${item.nombre} (${detalle})` : item.nombre;
 
-      const base = `- ${item.nombre}: ${item.cantidad} ${ETIQUETA_UNIDAD[item.unidad]}`;
+      if (item.cantidad == null) {
+        return `- ${nombreConDetalle}: cantidad por confirmar`;
+      }
+
+      const base = `- ${nombreConDetalle}: ${item.cantidad} ${ETIQUETA_UNIDAD[item.unidad]}`;
       // La cantidad de mosaico se guarda en m² — se agrega la conversión a
       // piezas (ver src/lib/cobertura.ts) para que la cotización llegue
       // lista para despachar, sin que el negocio tenga que volver a

@@ -33,6 +33,8 @@ export function CotizacionClient() {
           nombre: item.nombre,
           cantidad: item.cantidad,
           unidad: item.unidad,
+          categoria: item.categoria,
+          diseno: item.diseno,
         }))
       );
 
@@ -87,6 +89,16 @@ export function CotizacionClient() {
               >
                 {item.nombre}
               </Link>
+              {(item.categoria || item.diseno) && (
+                <p className="text-xs text-piedra">
+                  {[
+                    item.categoria ? `Categoría: ${item.categoria}` : null,
+                    item.diseno ? `Diseño: ${item.diseno}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
               {item.unidad === "M2" && item.cantidad != null && (
                 <p className="text-xs text-piedra">
                   ≈ {piezasDeMosaico(item.cantidad)} piezas

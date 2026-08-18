@@ -117,6 +117,13 @@ export type ItemCarrito = {
   imagenUrl: string | null;
   unidad: UnidadCotizacion;
   cantidad: number | null;
+  // Categoría ("Acera"/"Liso") y diseño (Maya, Granito, Espiral, Estrella,
+  // Palmera — ver src/lib/disenoMosaico.ts) del producto al momento de
+  // agregarlo al carrito. Solo aplican a mosaico; para moldura quedan null.
+  // Se llevan hasta el mensaje de WhatsApp para que la cotización llegue con
+  // más detalle, sin que el negocio tenga que volver a buscar el producto.
+  categoria: string | null;
+  diseno: string | null;
 };
 
 // ---------------------------------------------------------------------------

@@ -208,6 +208,8 @@ export default async function ProductoDetallePage({
                 tipo: producto.tipo,
                 sku: producto.sku,
                 imagenUrl: producto.imagenes[0]?.url ?? null,
+                categoria: producto.categoria?.nombre ?? null,
+                estilo: producto.estilo,
               }}
             />
             <WhatsAppButton

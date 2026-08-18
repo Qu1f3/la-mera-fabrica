@@ -14,6 +14,8 @@ type ProductoParaCarrito = {
   tipo: TipoProducto;
   sku: string | null;
   imagenUrl: string | null;
+  categoria: string | null;
+  estilo: string | null;
 };
 
 /**
@@ -54,6 +56,8 @@ export function AgregarCotizacionButton({
         sku: producto.sku,
         imagenUrl: producto.imagenUrl,
         unidad,
+        categoria: producto.categoria,
+        diseno: producto.estilo,
       },
       cantidadValida
     );

@@ -67,6 +67,8 @@ export function ProductCard({ producto }: { producto: ProductoTarjeta }) {
             tipo: producto.tipo,
             sku: producto.sku,
             imagenUrl: imagen?.url ?? null,
+            categoria: producto.categoria?.nombre ?? null,
+            estilo: producto.estilo,
           }}
           compacto
         />
