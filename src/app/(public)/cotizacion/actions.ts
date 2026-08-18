@@ -12,10 +12,11 @@ export type ItemSolicitud = {
   // m²/ml necesita — null significa "por confirmar", no cero.
   cantidad: number | null;
   unidad: UnidadCotizacion;
-  // Categoría y diseño del producto (ver ItemCarrito en src/lib/types.ts) —
-  // solo se usan para armar un mensaje de WhatsApp más completo, no se
-  // guardan en la base de datos (el producto ya queda enlazado por
-  // productoId, así que no hace falta duplicar el dato ahí).
+  // Código (sku), categoría y diseño del producto (ver ItemCarrito en
+  // src/lib/types.ts) — solo se usan para armar un mensaje de WhatsApp más
+  // completo, no se guardan en la base de datos (el producto ya queda
+  // enlazado por productoId, así que no hace falta duplicar el dato ahí).
+  sku: string | null;
   categoria: string | null;
   diseno: string | null;
 };

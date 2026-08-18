@@ -42,17 +42,20 @@ export function mensajeSolicitudCotizacion(datos: {
     nombre: string;
     cantidad: number | null;
     unidad: UnidadCotizacion;
+    sku: string | null;
     categoria: string | null;
     diseno: string | null;
   }[];
 }): string {
   const lista = datos.items
     .map((item) => {
-      // Categoría y diseño (ver src/lib/disenoMosaico.ts) entre paréntesis
-      // después del nombre, para que la cotización llegue con más detalle
-      // del producto y el negocio no tenga que ir a buscarlo — solo
-      // aparecen si el producto los tiene (moldura no tiene diseño).
+      // Código, categoría y diseño (ver src/lib/disenoMosaico.ts) entre
+      // paréntesis después del nombre, para que la cotización llegue con más
+      // detalle del producto y el negocio no tenga que ir a buscarlo — solo
+      // aparecen si el producto los tiene (no todos tienen código cargado, y
+      // moldura no tiene diseño).
       const detalle = [
+        item.sku ? `Código: ${item.sku}` : null,
         item.categoria ? `Categoría: ${item.categoria}` : null,
         item.diseno ? `Diseño: ${item.diseno}` : null,
       ]

@@ -33,6 +33,7 @@ export function CotizacionClient() {
           nombre: item.nombre,
           cantidad: item.cantidad,
           unidad: item.unidad,
+          sku: item.sku,
           categoria: item.categoria,
           diseno: item.diseno,
         }))
@@ -89,9 +90,10 @@ export function CotizacionClient() {
               >
                 {item.nombre}
               </Link>
-              {(item.categoria || item.diseno) && (
+              {(item.sku || item.categoria || item.diseno) && (
                 <p className="text-xs text-piedra">
                   {[
+                    item.sku ? `Código: ${item.sku}` : null,
                     item.categoria ? `Categoría: ${item.categoria}` : null,
                     item.diseno ? `Diseño: ${item.diseno}` : null,
                   ]
