@@ -37,6 +37,11 @@ export function CalculadoraCobertura({
   const [merma, setMerma] = useState(MERMA_SUGERIDA);
 
   const esMosaico = tipo === "MOSAICO";
+  // "ml" (metro lineal) es un término de construcción que no todo cliente
+  // conoce — se escribe completo la primera vez que aparece en la pantalla
+  // (el título/disparador de la calculadora), y se deja abreviado en el
+  // resto del bloque una vez que ya quedó explicado ahí arriba.
+  const etiquetaUnidadLarga = esMosaico ? "m²" : "ml (metros lineales)";
 
   const total = filas.reduce((suma, fila) => {
     const largo = Number(fila.largo);
@@ -88,7 +93,7 @@ export function CalculadoraCobertura({
       <button
         type="button"
         onClick={() => setAbierta(true)}
-        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-terracota/40 bg-terracota/5 px-3 py-2 text-xs font-medium text-terracota hover:bg-terracota/10 sm:w-auto"
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-terracota/40 bg-terracota/5 px-3 py-2 text-sm font-medium text-terracota hover:bg-terracota/10 sm:w-auto"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -111,7 +116,7 @@ export function CalculadoraCobertura({
           <line x1="15" y1="14" x2="15" y2="14.01" />
           <line x1="9" y1="17" x2="15" y2="17" />
         </svg>
-        No sé cuántos {esMosaico ? "m²" : "ml"} necesito — calcularlo con las
+        No sé cuántos {etiquetaUnidadLarga} necesito — calcularlo con las
         medidas de mi espacio
       </button>
     );
@@ -142,21 +147,20 @@ export function CalculadoraCobertura({
             <line x1="15" y1="14" x2="15" y2="14.01" />
             <line x1="9" y1="17" x2="15" y2="17" />
           </svg>
-          <h2 className="text-sm font-semibold text-carbon sm:text-base">
-            ¿No sabes cuántos {esMosaico ? "m²" : "ml"} necesitas? Calcúlalo
-            aquí
+          <h2 className="text-base font-semibold text-carbon sm:text-lg">
+            ¿No sabes cuántos {etiquetaUnidadLarga} necesitas? Calcúlalo aquí
           </h2>
         </div>
         <button
           type="button"
           onClick={() => setAbierta(false)}
-          className="shrink-0 text-xs text-piedra hover:underline"
+          className="shrink-0 text-sm text-piedra hover:underline"
         >
           Ocultar
         </button>
       </div>
 
-      <p className="mt-1 text-xs font-medium text-piedra sm:text-sm">
+      <p className="mt-1 text-sm font-medium text-piedra">
         {esMosaico
           ? "Mide cada sección del área a cubrir (en metros)"
           : "Mide cada tramo o pared donde va la moldura (en metros)"}
@@ -174,7 +178,7 @@ export function CalculadoraCobertura({
                 actualizarFila(indice, "largo", evento.target.value)
               }
               placeholder={esMosaico ? "Largo" : "Longitud"}
-              className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-900"
+              className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900"
               aria-label={
                 esMosaico
                   ? `Largo de la sección ${indice + 1} (metros)`
@@ -183,7 +187,7 @@ export function CalculadoraCobertura({
             />
             {esMosaico && (
               <>
-                <span className="text-xs text-piedra">×</span>
+                <span className="text-sm text-piedra">×</span>
                 <input
                   type="number"
                   min={0}
@@ -193,17 +197,17 @@ export function CalculadoraCobertura({
                     actualizarFila(indice, "ancho", evento.target.value)
                   }
                   placeholder="Ancho"
-                  className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-900"
+                  className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900"
                   aria-label={`Ancho de la sección ${indice + 1} (metros)`}
                 />
               </>
             )}
-            <span className="text-xs text-piedra">m</span>
+            <span className="text-sm text-piedra">m</span>
             {filas.length > 1 && (
               <button
                 type="button"
                 onClick={() => quitarFila(indice)}
-                className="ml-auto text-xs text-red-600 hover:underline"
+                className="ml-auto text-sm text-red-600 hover:underline"
               >
                 Quitar
               </button>
@@ -215,13 +219,13 @@ export function CalculadoraCobertura({
       <button
         type="button"
         onClick={agregarFila}
-        className="mt-2 text-xs font-medium text-terracota hover:underline"
+        className="mt-2 text-sm font-medium text-terracota hover:underline"
       >
         + Agregar {esMosaico ? "otra sección" : "otro tramo"}
       </button>
 
       <div className="mt-3 flex items-center gap-2">
-        <label className="text-xs text-piedra" htmlFor="merma-calculadora">
+        <label className="text-sm text-piedra" htmlFor="merma-calculadora">
           Margen para cortes/roturas
         </label>
         <input
@@ -232,9 +236,9 @@ export function CalculadoraCobertura({
           step={1}
           value={merma}
           onChange={(evento) => setMerma(evento.target.value)}
-          className="w-14 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-900"
+          className="w-14 rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900"
         />
-        <span className="text-xs text-piedra">%</span>
+        <span className="text-sm text-piedra">%</span>
       </div>
 
       {/*
@@ -243,20 +247,20 @@ export function CalculadoraCobertura({
         más) para que resalte del resto del formulario.
       */}
       <div className="mt-3 rounded-md bg-white p-3">
-        <p className="text-xs text-piedra sm:text-sm">Total estimado</p>
+        <p className="text-sm text-piedra">Total estimado</p>
         <p className="text-xl font-bold text-terracota sm:text-2xl">
           {totalRedondeado > 0
             ? `${totalRedondeado} ${esMosaico ? "m²" : "ml"}`
             : "—"}
         </p>
         {total > 0 && (
-          <p className="mt-0.5 text-xs text-piedra">
+          <p className="mt-0.5 text-sm text-piedra">
             {total.toFixed(2)} {esMosaico ? "m²" : "ml"} + {merma || 0}% de
             margen
           </p>
         )}
         {unidadesEstimadas !== null && (
-          <p className="mt-1 text-xs text-piedra sm:text-sm">
+          <p className="mt-1 text-sm text-piedra">
             Eso son aproximadamente{" "}
             <span className="font-semibold text-carbon">
               {unidadesEstimadas} mosaicos

@@ -129,7 +129,7 @@ export default async function ProductoDetallePage({
         />
 
         <div>
-          <span className="text-xs font-medium uppercase tracking-wide text-piedra">
+          <span className="text-sm font-medium uppercase tracking-wide text-piedra">
             {ETIQUETA_TIPO[producto.tipo]}
             {producto.categoria ? ` · ${producto.categoria.nombre}` : ""}
           </span>
@@ -140,7 +140,7 @@ export default async function ProductoDetallePage({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <DisponibilidadBadge disponibilidad={producto.disponibilidad} />
             {producto.sku && (
-              <span className="text-xs text-piedra">Código {producto.sku}</span>
+              <span className="text-sm text-piedra">Código {producto.sku}</span>
             )}
           </div>
 

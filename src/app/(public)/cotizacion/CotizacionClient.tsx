@@ -91,7 +91,7 @@ export function CotizacionClient() {
                 {item.nombre}
               </Link>
               {(item.sku || item.categoria || item.diseno) && (
-                <p className="text-xs text-piedra">
+                <p className="text-sm text-piedra">
                   {[
                     item.sku ? `Código: ${item.sku}` : null,
                     item.categoria ? `Categoría: ${item.categoria}` : null,
@@ -102,7 +102,7 @@ export function CotizacionClient() {
                 </p>
               )}
               {item.unidad === "M2" && item.cantidad != null && (
-                <p className="text-xs text-piedra">
+                <p className="text-sm text-piedra">
                   ≈ {piezasDeMosaico(item.cantidad)} piezas
                 </p>
               )}
@@ -120,25 +120,26 @@ export function CotizacionClient() {
                 );
               }}
               placeholder="¿Cuántos?"
-              className="w-24 rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900 placeholder:text-xs placeholder:text-neutral-400"
+              className="w-24 rounded-md border border-neutral-300 px-2 py-2 text-sm text-neutral-900 placeholder:text-sm placeholder:text-neutral-400"
               aria-label={`Cantidad de ${item.nombre} (opcional)`}
             />
-            <span className="w-6 text-xs text-piedra">
+            <span className="w-6 text-sm text-piedra">
               {ETIQUETA_UNIDAD[item.unidad]}
             </span>
             <button
               type="button"
               onClick={() => quitarItem(item.productoId)}
-              className="text-xs font-medium text-red-600 hover:underline"
+              className="text-sm font-medium text-red-600 hover:underline"
             >
               Quitar
             </button>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-piedra">
-        ¿No sabes cuántos m²/ml necesitas todavía? Puedes dejar la cantidad en
-        blanco — igual recibimos tu solicitud.
+      <p className="mt-2 text-sm text-piedra">
+        ¿No sabes cuántos metros cuadrados (m²) o metros lineales (ml)
+        necesitas todavía? Puedes dejar la cantidad en blanco — igual
+        recibimos tu solicitud.
       </p>
 
       <form

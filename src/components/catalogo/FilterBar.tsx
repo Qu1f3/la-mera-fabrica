@@ -31,7 +31,7 @@ export function FilterBar({
       className="flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4"
     >
       <div className="flex flex-col gap-1">
-        <label htmlFor="q" className="text-xs font-medium text-piedra">
+        <label htmlFor="q" className="text-sm font-medium text-piedra">
           Buscar
         </label>
         <input
@@ -39,13 +39,13 @@ export function FilterBar({
           name="q"
           type="search"
           defaultValue={valores.q ?? ""}
-          placeholder="Nombre"
+          placeholder="Nombre o código"
           className={selectClass}
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="tipo" className="text-xs font-medium text-piedra">
+        <label htmlFor="tipo" className="text-sm font-medium text-piedra">
           Tipo
         </label>
         <select
@@ -62,7 +62,7 @@ export function FilterBar({
 
       {categorias.length > 0 && (
         <div className="flex flex-col gap-1">
-          <label htmlFor="categoria" className="text-xs font-medium text-piedra">
+          <label htmlFor="categoria" className="text-sm font-medium text-piedra">
             Categoría
           </label>
           <select
@@ -83,7 +83,7 @@ export function FilterBar({
 
       {estilos.length > 0 && (
         <div className="flex flex-col gap-1">
-          <label htmlFor="estilo" className="text-xs font-medium text-piedra">
+          <label htmlFor="estilo" className="text-sm font-medium text-piedra">
             Diseño
           </label>
           <select
@@ -104,7 +104,7 @@ export function FilterBar({
 
       {acabados.length > 0 && (
         <div className="flex flex-col gap-1">
-          <label htmlFor="acabado" className="text-xs font-medium text-piedra">
+          <label htmlFor="acabado" className="text-sm font-medium text-piedra">
             Acabado
           </label>
           <select
@@ -125,7 +125,7 @@ export function FilterBar({
 
       {aplicaciones.length > 0 && (
         <div className="flex flex-col gap-1">
-          <label htmlFor="aplicacion" className="text-xs font-medium text-piedra">
+          <label htmlFor="aplicacion" className="text-sm font-medium text-piedra">
             Aplicación
           </label>
           <select

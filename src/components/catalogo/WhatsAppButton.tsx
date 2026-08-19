@@ -34,7 +34,11 @@ export function WhatsAppButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => trackEvent("clic_whatsapp", { contexto })}
-      className={`inline-flex items-center justify-center gap-2 rounded-md bg-terracota px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-terracota-dark ${className}`}
+      // Verde clásico de WhatsApp (#25D366 / hover #1EBE57) en vez del
+      // terracota de la marca: para este botón específico, el verde
+      // reconocible ayuda a que usuarios no técnicos identifiquen de
+      // inmediato que lleva a WhatsApp.
+      className={`inline-flex items-center justify-center gap-2 rounded-md bg-[#25D366] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1EBE57] ${className}`}
     >
       <svg
         viewBox="0 0 24 24"

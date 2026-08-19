@@ -108,17 +108,17 @@ export function AgregarCotizacionButton({
           value={cantidad}
           onChange={(evento) => setCantidad(evento.target.value)}
           placeholder={compacto ? "Cant." : "Cantidad"}
-          className={`rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 ${
+          className={`rounded-md border border-neutral-300 px-2 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 ${
             compacto ? "w-16" : "w-24"
           }`}
           aria-label={`Cantidad en ${ETIQUETA_UNIDAD[unidad]} (opcional)`}
         />
-        <span className="text-xs text-piedra">{ETIQUETA_UNIDAD[unidad]}</span>
+        <span className="text-sm text-piedra">{ETIQUETA_UNIDAD[unidad]}</span>
         <button
           type="button"
           onClick={agregar}
           className={`flex-1 rounded-md bg-terracota font-medium text-white transition-colors hover:bg-terracota-dark ${
-            compacto ? "px-2 py-1.5 text-xs" : "px-4 py-2 text-sm"
+            compacto ? "px-2 py-2 text-sm" : "px-4 py-2.5 text-sm"
           }`}
         >
           {compacto ? "Agregar" : "Agregar a cotización"}

@@ -46,7 +46,7 @@ export function ImagenPlaceholder({
         </defs>
         <rect width="200" height="200" fill={`url(#${patternId})`} />
       </svg>
-      <span className="relative rounded-full bg-white/85 px-3 py-1 text-center text-xs font-medium tracking-wide text-piedra">
+      <span className="relative rounded-full bg-white/85 px-3 py-1 text-center text-sm font-medium tracking-wide text-piedra">
         {ETIQUETA_TIPO[tipo]} · foto próximamente
       </span>
     </div>

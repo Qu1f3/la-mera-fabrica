@@ -24,11 +24,11 @@ export function BannerStrip({ banners }: { banners: BannerPublico[] }) {
                 </div>
               )}
               <div className="flex flex-1 flex-col justify-center gap-1 p-4">
-                <p className="text-sm font-semibold text-carbon">
+                <p className="text-base font-semibold text-carbon">
                   {banner.titulo}
                 </p>
                 {banner.subtitulo && (
-                  <p className="text-xs text-piedra">{banner.subtitulo}</p>
+                  <p className="text-sm text-piedra">{banner.subtitulo}</p>
                 )}
               </div>
             </div>

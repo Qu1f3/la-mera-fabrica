@@ -36,15 +36,15 @@ export function ProductCard({ producto }: { producto: ProductoTarjeta }) {
         </div>
 
         <div className="flex flex-1 flex-col gap-1.5 p-4 pb-3">
-          <span className="text-xs font-medium uppercase tracking-wide text-piedra">
+          <span className="text-sm font-medium uppercase tracking-wide text-piedra">
             {ETIQUETA_TIPO[producto.tipo]}
             {producto.categoria ? ` · ${producto.categoria.nombre}` : ""}
           </span>
-          <h3 className="text-sm font-semibold text-carbon">
+          <h3 className="text-base font-semibold text-carbon">
             {producto.nombre}
           </h3>
           {(producto.estilo || producto.acabado) && (
-            <p className="text-xs text-piedra">
+            <p className="text-sm text-piedra">
               {[producto.estilo, producto.acabado].filter(Boolean).join(" · ")}
             </p>
           )}

@@ -30,12 +30,20 @@ export function MobileNav({
 
   return (
     <div className="sm:hidden">
+      {/*
+        Antes era solo el ícono de "hamburguesa" sin ninguna palabra al
+        lado — un patrón muy familiar para usuarios jóvenes/técnicos, pero
+        que a un adulto mayor o alguien no técnico no siempre le queda claro
+        que ahí hay un menú para abrir. Se agregó la palabra "Menú" junto al
+        ícono, y se agrandó el botón (antes 36×36px) para que sea más fácil
+        de tocar con precisión.
+      */}
       <button
         type="button"
         onClick={() => setAbierto((valor) => !valor)}
         aria-expanded={abierto}
         aria-label={abierto ? "Cerrar menú" : "Abrir menú"}
-        className="flex h-9 w-9 items-center justify-center rounded-md text-carbon hover:bg-arena"
+        className="flex h-11 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-carbon hover:bg-arena"
       >
         <svg
           viewBox="0 0 24 24"
@@ -51,6 +59,7 @@ export function MobileNav({
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           )}
         </svg>
+        {abierto ? "Cerrar" : "Menú"}
       </button>
 
       {abierto && (
