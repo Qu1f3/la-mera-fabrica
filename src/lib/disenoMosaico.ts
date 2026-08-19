@@ -13,7 +13,7 @@
  * existe una Acera con diseño Espiral.
  */
 export const DISENOS_MOSAICO = [
-  "Maya",
+  "Malla",
   "Granito",
   "Espiral",
   "Estrella",
