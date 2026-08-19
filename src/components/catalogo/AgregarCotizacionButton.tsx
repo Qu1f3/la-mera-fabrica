@@ -88,17 +88,19 @@ export function AgregarCotizacionButton({
     >
       {/*
         La calculadora va ANTES del campo de cantidad (no debajo, escondida)
-        — el usuario pidió que fuera más fácil de encontrar, y muchos
-        clientes ni saben cuántos m²/ml necesitan hasta que miden su
-        espacio, así que tiene sentido ofrecerla primero.
+        y ahora abierta por defecto (ver `CalculadoraCobertura`) — el
+        usuario pidió que tuviera "más protagonismo" en la ficha de
+        producto, así que es lo primero que se ve de todo este bloque.
       */}
       {!compacto && (
-        <CalculadoraCobertura
-          tipo={producto.tipo}
-          onUsar={(total) => setCantidad(String(total))}
-        />
+        <div className="mb-3">
+          <CalculadoraCobertura
+            tipo={producto.tipo}
+            onUsar={(total) => setCantidad(String(total))}
+          />
+        </div>
       )}
-      <div className="mt-2 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <input
           type="number"
           min={0.5}

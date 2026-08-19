@@ -28,7 +28,11 @@ export function CalculadoraCobertura({
   tipo: TipoProducto;
   onUsar: (total: number) => void;
 }) {
-  const [abierta, setAbierta] = useState(false);
+  // El usuario pidió que la calculadora tuviera "más protagonismo" — pasó de
+  // un botón chico que había que abrir, a un bloque abierto de entrada (el
+  // cliente la ve sin tener que descubrirla primero). Sigue pudiendo
+  // ocultarla si no la necesita (botón "Ocultar" dentro del bloque).
+  const [abierta, setAbierta] = useState(true);
   const [filas, setFilas] = useState<Fila[]>([{ largo: "", ancho: "" }]);
   const [merma, setMerma] = useState(MERMA_SUGERIDA);
 
@@ -77,15 +81,14 @@ export function CalculadoraCobertura({
   }
 
   if (!abierta) {
-    // Antes era un texto chico subrayado (fácil de pasar por alto) — el
-    // usuario pidió que el cálculo de m²/ml fuera más fácil de encontrar,
-    // así que ahora es un botón con su propio fondo y borde, del mismo
-    // tamaño de "toque" que los demás botones del sitio.
+    // Solo se llega aquí si el cliente la ocultó a propósito (ver estado
+    // inicial arriba, ahora abierta por defecto). Se deja un disparador
+    // igual de visible que antes para volver a mostrarla.
     return (
       <button
         type="button"
         onClick={() => setAbierta(true)}
-        className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-terracota/40 bg-terracota/5 px-3 py-2 text-xs font-medium text-terracota hover:bg-terracota/10 sm:w-auto"
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-terracota/40 bg-terracota/5 px-3 py-2 text-xs font-medium text-terracota hover:bg-terracota/10 sm:w-auto"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -115,14 +118,51 @@ export function CalculadoraCobertura({
   }
 
   return (
-    <div className="mt-2 rounded-md border border-neutral-200 bg-arena/40 p-3">
-      <p className="text-xs font-medium text-carbon">
+    <div className="rounded-lg border-2 border-terracota/30 bg-terracota/5 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5 shrink-0 text-terracota"
+            aria-hidden="true"
+          >
+            <rect x="5" y="3" width="14" height="18" rx="2" />
+            <line x1="9" y1="7" x2="15" y2="7" />
+            <line x1="9" y1="11" x2="9" y2="11.01" />
+            <line x1="12" y1="11" x2="12" y2="11.01" />
+            <line x1="15" y1="11" x2="15" y2="11.01" />
+            <line x1="9" y1="14" x2="9" y2="14.01" />
+            <line x1="12" y1="14" x2="12" y2="14.01" />
+            <line x1="15" y1="14" x2="15" y2="14.01" />
+            <line x1="9" y1="17" x2="15" y2="17" />
+          </svg>
+          <h2 className="text-sm font-semibold text-carbon sm:text-base">
+            ¿No sabes cuántos {esMosaico ? "m²" : "ml"} necesitas? Calcúlalo
+            aquí
+          </h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAbierta(false)}
+          className="shrink-0 text-xs text-piedra hover:underline"
+        >
+          Ocultar
+        </button>
+      </div>
+
+      <p className="mt-1 text-xs font-medium text-piedra sm:text-sm">
         {esMosaico
           ? "Mide cada sección del área a cubrir (en metros)"
           : "Mide cada tramo o pared donde va la moldura (en metros)"}
       </p>
 
-      <div className="mt-2 space-y-2">
+      <div className="mt-3 space-y-2">
         {filas.map((fila, indice) => (
           <div key={indice} className="flex items-center gap-2">
             <input
@@ -197,47 +237,45 @@ export function CalculadoraCobertura({
         <span className="text-xs text-piedra">%</span>
       </div>
 
-      <p className="mt-2 text-xs text-piedra">
-        Total estimado:{" "}
-        <span className="font-semibold text-carbon">
+      {/*
+        El total es el resultado que el cliente busca al abrir esto — se le
+        da su propia tarjeta blanca dentro del bloque (en vez de un párrafo
+        más) para que resalte del resto del formulario.
+      */}
+      <div className="mt-3 rounded-md bg-white p-3">
+        <p className="text-xs text-piedra sm:text-sm">Total estimado</p>
+        <p className="text-xl font-bold text-terracota sm:text-2xl">
           {totalRedondeado > 0
             ? `${totalRedondeado} ${esMosaico ? "m²" : "ml"}`
             : "—"}
-        </span>
-        {total > 0 &&
-          ` (${total.toFixed(2)} ${esMosaico ? "m²" : "ml"} + ${
-            merma || 0
-          }% de margen)`}
-      </p>
-
-      {unidadesEstimadas !== null && (
-        <p className="mt-1 text-xs text-piedra">
-          Eso son aproximadamente{" "}
-          <span className="font-semibold text-carbon">
-            {unidadesEstimadas} mosaicos
-          </span>{" "}
-          (a {MOSAICOS_POR_M2} piezas por m²).
         </p>
-      )}
+        {total > 0 && (
+          <p className="mt-0.5 text-xs text-piedra">
+            {total.toFixed(2)} {esMosaico ? "m²" : "ml"} + {merma || 0}% de
+            margen
+          </p>
+        )}
+        {unidadesEstimadas !== null && (
+          <p className="mt-1 text-xs text-piedra sm:text-sm">
+            Eso son aproximadamente{" "}
+            <span className="font-semibold text-carbon">
+              {unidadesEstimadas} mosaicos
+            </span>{" "}
+            (a {MOSAICOS_POR_M2} piezas por m²).
+          </p>
+        )}
+      </div>
 
-      <div className="mt-3 flex gap-3">
+      <div className="mt-3">
         <button
           type="button"
           disabled={totalRedondeado <= 0}
           onClick={() => {
             onUsar(totalRedondeado);
-            setAbierta(false);
           }}
-          className="rounded-md bg-terracota px-3 py-1.5 text-xs font-medium text-white hover:bg-terracota-dark disabled:opacity-50"
+          className="w-full rounded-md bg-terracota px-4 py-2.5 text-sm font-semibold text-white hover:bg-terracota-dark disabled:opacity-50 sm:w-auto"
         >
           Usar este cálculo
-        </button>
-        <button
-          type="button"
-          onClick={() => setAbierta(false)}
-          className="text-xs text-piedra hover:underline"
-        >
-          Cancelar
         </button>
       </div>
     </div>
