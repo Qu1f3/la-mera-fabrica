@@ -10,7 +10,7 @@ import {
 } from "@/lib/types";
 import { ProductGallery } from "@/components/catalogo/ProductGallery";
 import { DisponibilidadBadge } from "@/components/catalogo/DisponibilidadBadge";
-import { ProductCard } from "@/components/catalogo/ProductCard";
+import { CarruselProductos } from "@/components/catalogo/CarruselProductos";
 import { WhatsAppButton } from "@/components/catalogo/WhatsAppButton";
 import { AgregarCotizacionButton } from "@/components/catalogo/AgregarCotizacionButton";
 import { mensajeConsultaProducto } from "@/lib/whatsapp";
@@ -226,10 +226,8 @@ export default async function ProductoDetallePage({
           <h2 className="text-lg font-semibold text-carbon">
             {producto.tipo === "MOSAICO" ? "Moldura a juego" : "Mosaico a juego"}
           </h2>
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {complementarios.map((r) => (
-              <ProductCard key={r.id} producto={r} />
-            ))}
+          <div className="mt-4">
+            <CarruselProductos productos={complementarios} />
           </div>
         </section>
       )}
@@ -239,10 +237,8 @@ export default async function ProductoDetallePage({
           <h2 className="text-lg font-semibold text-carbon">
             También te puede interesar
           </h2>
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {similares.map((r) => (
-              <ProductCard key={r.id} producto={r} />
-            ))}
+          <div className="mt-4">
+            <CarruselProductos productos={similares} />
           </div>
         </section>
       )}

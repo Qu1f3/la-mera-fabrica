@@ -39,7 +39,7 @@ export function FilterBar({
           name="q"
           type="search"
           defaultValue={valores.q ?? ""}
-          placeholder="Nombre o código"
+          placeholder="Nombre"
           className={selectClass}
         />
       </div>
