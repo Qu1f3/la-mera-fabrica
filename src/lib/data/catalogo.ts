@@ -32,6 +32,11 @@ export type FiltrosCatalogo = {
   q?: string;
 };
 
+// El usuario pidió el catálogo por páginas de 16 productos (4 filas de 4,
+// que es justo el grid `lg:grid-cols-4` que ya usa la página). Con el
+// catálogo real (menos de 50 productos) esto da 2-3 páginas como mucho.
+export const PRODUCTOS_POR_PAGINA = 16;
+
 export async function listCategoriasActivas() {
   return prisma.categoria.findMany({
     where: { activo: true },
@@ -68,35 +73,58 @@ export async function listOpcionesFiltro() {
   };
 }
 
+/**
+ * `pagina` es 1-based (la página 1 es la primera). Devuelve, junto con los
+ * productos de esa página, el total real que cumple los filtros (para
+ * calcular cuántas páginas mostrar) y la página que realmente se usó —
+ * puede ser distinta de la pedida si venía fuera de rango (ver más abajo).
+ */
 export async function listProductosPublicos(
-  filtros: FiltrosCatalogo
-): Promise<ProductoTarjeta[]> {
+  filtros: FiltrosCatalogo,
+  pagina = 1
+): Promise<{ productos: ProductoTarjeta[]; total: number; pagina: number }> {
+  const where = {
+    activo: true,
+    ...(filtros.tipo ? { tipo: filtros.tipo } : {}),
+    ...(filtros.categoriaSlug
+      ? { categoria: { slug: filtros.categoriaSlug } }
+      : {}),
+    ...(filtros.estilo ? { estilo: filtros.estilo } : {}),
+    ...(filtros.acabado ? { acabado: filtros.acabado } : {}),
+    ...(filtros.aplicacion
+      ? { aplicaciones: { has: filtros.aplicacion } }
+      : {}),
+    ...(filtros.q
+      ? {
+          OR: [
+            { nombre: { contains: filtros.q, mode: "insensitive" as const } },
+            { sku: { contains: filtros.q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+
+  // El total se calcula ANTES de traer los productos para poder corregir
+  // una página fuera de rango (ej. si alguien edita `?page=99` a mano, o si
+  // un filtro nuevo deja menos páginas de las que había) — así nunca se
+  // devuelve una página vacía cuando en realidad sí hay resultados en una
+  // página anterior.
+  const total = await prisma.producto.count({ where });
+  const totalPaginas = Math.max(1, Math.ceil(total / PRODUCTOS_POR_PAGINA));
+  const paginaValida =
+    Number.isFinite(pagina) && pagina > 0
+      ? Math.min(Math.floor(pagina), totalPaginas)
+      : 1;
+
   const productos = await prisma.producto.findMany({
-    where: {
-      activo: true,
-      ...(filtros.tipo ? { tipo: filtros.tipo } : {}),
-      ...(filtros.categoriaSlug
-        ? { categoria: { slug: filtros.categoriaSlug } }
-        : {}),
-      ...(filtros.estilo ? { estilo: filtros.estilo } : {}),
-      ...(filtros.acabado ? { acabado: filtros.acabado } : {}),
-      ...(filtros.aplicacion
-        ? { aplicaciones: { has: filtros.aplicacion } }
-        : {}),
-      ...(filtros.q
-        ? {
-            OR: [
-              { nombre: { contains: filtros.q, mode: "insensitive" as const } },
-              { sku: { contains: filtros.q, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
-    },
+    where,
     orderBy: [{ destacado: "desc" }, { nombre: "asc" }],
     select: SELECT_TARJETA,
+    skip: (paginaValida - 1) * PRODUCTOS_POR_PAGINA,
+    take: PRODUCTOS_POR_PAGINA,
   });
 
-  return productos as ProductoTarjeta[];
+  return { productos: productos as ProductoTarjeta[], total, pagina: paginaValida };
 }
 
 export async function listProductosDestacados(

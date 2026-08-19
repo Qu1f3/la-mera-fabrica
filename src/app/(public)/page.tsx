@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import {
+  PRODUCTOS_POR_PAGINA,
   listCategoriasActivas,
   listOpcionesFiltro,
   listProductosPublicos,
@@ -8,6 +9,7 @@ import { listBannersActivos, listTestimoniosActivos } from "@/lib/data/contenido
 import type { TipoProducto } from "@/lib/types";
 import { FilterBar } from "@/components/catalogo/FilterBar";
 import { ProductCard } from "@/components/catalogo/ProductCard";
+import { Paginacion } from "@/components/catalogo/Paginacion";
 import { BannerStrip } from "@/components/contenido/BannerStrip";
 import { TestimoniosSection } from "@/components/contenido/TestimoniosSection";
 
@@ -39,14 +41,27 @@ export default async function Home({
     q: uno(sp.q),
   };
 
-  const [productos, categorias, opciones, banners, testimonios] =
+  // Página 1 por defecto (también si viene un valor inválido, ej. "abc" o
+  // negativo) — ver `Paginacion.tsx`: la página 1 nunca lleva `?page=` en
+  // la URL, así que este caso solo se da si alguien edita la URL a mano.
+  // `listProductosPublicos` además corrige sola una página fuera de rango
+  // (ej. `?page=99` con solo 2 páginas reales) devolviendo la que sí existe.
+  const paginaSolicitada = Number(uno(sp.page));
+  const paginaPedida =
+    Number.isFinite(paginaSolicitada) && paginaSolicitada > 0
+      ? Math.floor(paginaSolicitada)
+      : 1;
+
+  const [{ productos, total, pagina }, categorias, opciones, banners, testimonios] =
     await Promise.all([
-      listProductosPublicos(filtros),
+      listProductosPublicos(filtros, paginaPedida),
       listCategoriasActivas(),
       listOpcionesFiltro(),
       listBannersActivos(),
       listTestimoniosActivos(),
     ]);
+
+  const totalPaginas = Math.max(1, Math.ceil(total / PRODUCTOS_POR_PAGINA));
 
   return (
     <main>
@@ -79,11 +94,25 @@ export default async function Home({
         </div>
 
         {productos.length > 0 ? (
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {productos.map((producto) => (
-              <ProductCard key={producto.id} producto={producto} />
-            ))}
-          </div>
+          <>
+            <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {productos.map((producto) => (
+                <ProductCard key={producto.id} producto={producto} />
+              ))}
+            </div>
+            <Paginacion
+              paginaActual={pagina}
+              totalPaginas={totalPaginas}
+              parametros={{
+                tipo: filtros.tipo,
+                categoria: filtros.categoriaSlug,
+                estilo: filtros.estilo,
+                acabado: filtros.acabado,
+                aplicacion: filtros.aplicacion,
+                q: filtros.q,
+              }}
+            />
+          </>
         ) : (
           <div className="mt-16 text-center text-piedra">
             <p>No hay productos que coincidan con estos filtros todavía.</p>
