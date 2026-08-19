@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart/CartContext";
 import { ETIQUETA_UNIDAD, UNIDAD_POR_TIPO } from "@/lib/types";
 import type { TipoProducto } from "@/lib/types";
@@ -39,10 +40,15 @@ export function AgregarCotizacionButton({
   className?: string;
 }) {
   const { agregarItem } = useCart();
+  const router = useRouter();
   const [cantidad, setCantidad] = useState("");
-  const [agregado, setAgregado] = useState(false);
   const unidad = UNIDAD_POR_TIPO[producto.tipo];
 
+  // El usuario pidió que, al agregar un producto, se lleve directo a la
+  // pantalla de cotización (antes solo mostraba un "Agregado ✓" y el
+  // cliente se quedaba en la misma página, sin saber que ya podía revisar
+  // y enviar su solicitud). Se aplica igual desde la ficha de producto y
+  // desde la tarjeta del catálogo (`compacto`).
   function agregar() {
     const numero = cantidad.trim() === "" ? null : Number(cantidad);
     const cantidadValida = numero !== null && numero > 0 ? numero : null;
@@ -66,8 +72,7 @@ export function AgregarCotizacionButton({
       producto_nombre: producto.nombre,
       tipo: producto.tipo,
     });
-    setAgregado(true);
-    window.setTimeout(() => setAgregado(false), 1500);
+    router.push("/cotizacion");
   }
 
   return (
@@ -81,7 +86,19 @@ export function AgregarCotizacionButton({
         evento.stopPropagation();
       }}
     >
-      <div className="flex items-center gap-2">
+      {/*
+        La calculadora va ANTES del campo de cantidad (no debajo, escondida)
+        — el usuario pidió que fuera más fácil de encontrar, y muchos
+        clientes ni saben cuántos m²/ml necesitan hasta que miden su
+        espacio, así que tiene sentido ofrecerla primero.
+      */}
+      {!compacto && (
+        <CalculadoraCobertura
+          tipo={producto.tipo}
+          onUsar={(total) => setCantidad(String(total))}
+        />
+      )}
+      <div className="mt-2 flex items-center gap-2">
         <input
           type="number"
           min={0.5}
@@ -102,21 +119,9 @@ export function AgregarCotizacionButton({
             compacto ? "px-2 py-1.5 text-xs" : "px-4 py-2 text-sm"
           }`}
         >
-          {agregado ? "Agregado ✓" : compacto ? "Agregar" : "Agregar a cotización"}
+          {compacto ? "Agregar" : "Agregar a cotización"}
         </button>
       </div>
-      {!compacto && (
-        <div className="mt-1.5">
-          <p className="text-xs text-piedra">
-            ¿No sabes cuántos {ETIQUETA_UNIDAD[unidad]} necesitas? Puedes
-            dejarlo en blanco, o calcularlo con las medidas de tu espacio.
-          </p>
-          <CalculadoraCobertura
-            tipo={producto.tipo}
-            onUsar={(total) => setCantidad(String(total))}
-          />
-        </div>
-      )}
     </div>
   );
 }

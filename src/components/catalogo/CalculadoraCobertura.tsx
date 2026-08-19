@@ -77,13 +77,39 @@ export function CalculadoraCobertura({
   }
 
   if (!abierta) {
+    // Antes era un texto chico subrayado (fácil de pasar por alto) — el
+    // usuario pidió que el cálculo de m²/ml fuera más fácil de encontrar,
+    // así que ahora es un botón con su propio fondo y borde, del mismo
+    // tamaño de "toque" que los demás botones del sitio.
     return (
       <button
         type="button"
         onClick={() => setAbierta(true)}
-        className="text-xs font-medium text-terracota underline decoration-dotted"
+        className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-terracota/40 bg-terracota/5 px-3 py-2 text-xs font-medium text-terracota hover:bg-terracota/10 sm:w-auto"
       >
-        Calcúlalo con las medidas de tu espacio
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4 shrink-0"
+          aria-hidden="true"
+        >
+          <rect x="5" y="3" width="14" height="18" rx="2" />
+          <line x1="9" y1="7" x2="15" y2="7" />
+          <line x1="9" y1="11" x2="9" y2="11.01" />
+          <line x1="12" y1="11" x2="12" y2="11.01" />
+          <line x1="15" y1="11" x2="15" y2="11.01" />
+          <line x1="9" y1="14" x2="9" y2="14.01" />
+          <line x1="12" y1="14" x2="12" y2="14.01" />
+          <line x1="15" y1="14" x2="15" y2="14.01" />
+          <line x1="9" y1="17" x2="15" y2="17" />
+        </svg>
+        No sé cuántos {esMosaico ? "m²" : "ml"} necesito — calcularlo con las
+        medidas de mi espacio
       </button>
     );
   }
