@@ -74,11 +74,38 @@ export function CotizacionClient() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-semibold text-carbon">Tu cotización</h1>
-      <p className="mt-1 text-sm text-piedra">
-        Revisa los productos, ajusta las cantidades y déjanos tus datos —
-        respondemos por WhatsApp con precio y disponibilidad.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-carbon">
+            Tu cotización
+          </h1>
+          <p className="mt-1 text-sm text-piedra">
+            Revisa los productos, ajusta las cantidades y déjanos tus datos —
+            respondemos por WhatsApp con precio y disponibilidad.
+          </p>
+        </div>
+        {/* Para que el cliente pueda volver al catálogo y agregar más
+            productos sin perder lo que ya tiene en la cotización. */}
+        <Link
+          href="/"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-carbon hover:bg-arena"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          Seguir comprando
+        </Link>
+      </div>
 
       <ul className="mt-6 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
         {items.map((item) => (
