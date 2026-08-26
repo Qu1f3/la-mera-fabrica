@@ -79,3 +79,28 @@ export function mensajeSolicitudCotizacion(datos: {
 
   return `Hola, soy ${datos.nombreCliente}. Quisiera una cotización de:\n${lista}\n\nVi los productos en el sitio de La Mera Fábrica.`;
 }
+
+// ---------------------------------------------------------------------------
+// Sistema de gestión: mensajes de pedido
+// ---------------------------------------------------------------------------
+// Plantillas por defecto -- el admin las puede editar en el modal antes de
+// enviar (ver ConfirmarPedidoWhatsApp.tsx). Más adelante (plantillas
+// configurables desde el panel, modelo PlantillaMensaje) esto pasa a leerse
+// de la base de datos en vez de vivir hardcodeado acá; mientras tanto el
+// texto es exactamente el que se acordó.
+
+export function mensajeConfirmacionPedido(datos: {
+  nombreCliente: string;
+  codigo: string;
+  linkTracker: string;
+}): string {
+  return `Hola, ${datos.nombreCliente}. \u{1F9F1}\n\nHemos recibido correctamente su pedido en Ladrillera La Mera Fábrica.\n\nSu código de pedido es:\n${datos.codigo}\n\nPuedes consultar el estado de tu pedido aquí:\n${datos.linkTracker}\n\nGracias por confiar en nosotros. \u{1F3ED}`;
+}
+
+export function mensajePedidoListo(datos: {
+  nombreCliente: string;
+  codigo: string;
+  fecha: string;
+}): string {
+  return `Hola, ${datos.nombreCliente}. \u{1F9F1}\n\nLe informamos que su pedido ${datos.codigo} ya está listo.\n\nPuede pasar a recogerlo a partir del ${datos.fecha}.\n\nGracias por su preferencia.\nLadrillera La Mera Fábrica.`;
+}

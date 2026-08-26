@@ -157,3 +157,110 @@ export type SeccionContenidoPublica = {
   cuerpo: string | null;
   imagenUrl: string | null;
 } | null;
+
+// ---------------------------------------------------------------------------
+// Sistema de gestión: pedidos (panel interno, distinto de la cotización
+// pública de arriba)
+// ---------------------------------------------------------------------------
+
+export type EstadoPedido =
+  | "PEDIDO_RECIBIDO"
+  | "EN_PRODUCCION"
+  | "EN_SECADO"
+  | "EN_RIEGO"
+  | "LISTO"
+  | "ENTREGADO"
+  | "CANCELADO";
+
+export type EstadoEntrega =
+  | "PENDIENTE"
+  | "LISTO"
+  | "EN_ENTREGA"
+  | "ENTREGADO"
+  | "CANCELADO";
+
+// Orden real del ciclo de vida de un pedido (para la cola, el stepper del
+// tracker público más adelante, y cualquier lugar que necesite "¿qué tan
+// avanzado va esto?"). CANCELADO queda fuera a propósito: no es un paso del
+// camino normal, es una salida.
+export const ORDEN_ESTADO_PEDIDO: EstadoPedido[] = [
+  "PEDIDO_RECIBIDO",
+  "EN_PRODUCCION",
+  "EN_SECADO",
+  "EN_RIEGO",
+  "LISTO",
+  "ENTREGADO",
+];
+
+export const ETIQUETA_ESTADO_PEDIDO: Record<EstadoPedido, string> = {
+  PEDIDO_RECIBIDO: "Pedido recibido",
+  EN_PRODUCCION: "En producción",
+  EN_SECADO: "En secado",
+  EN_RIEGO: "En riego",
+  LISTO: "Listo",
+  ENTREGADO: "Entregado",
+  CANCELADO: "Cancelado",
+};
+
+export const ETIQUETA_ESTADO_ENTREGA: Record<EstadoEntrega, string> = {
+  PENDIENTE: "Pendiente",
+  LISTO: "Listo",
+  EN_ENTREGA: "En entrega",
+  ENTREGADO: "Entregado",
+  CANCELADO: "Cancelado",
+};
+
+/**
+ * Color de cada estado para el Badge del panel (ver
+ * src/components/admin/ui/EstadoBadge.tsx) — clases de Tailwind ya
+ * combinadas en fondo/texto/borde suaves, mismo patrón que ya usa el panel
+ * para su "zona de riesgo" (bg-*-50 text-*-700 border-*-200).
+ */
+export const COLOR_ESTADO_PEDIDO: Record<EstadoPedido, string> = {
+  PEDIDO_RECIBIDO: "bg-neutral-100 text-neutral-700 border-neutral-300",
+  EN_PRODUCCION: "bg-amber-50 text-amber-700 border-amber-200",
+  EN_SECADO: "bg-orange-50 text-orange-700 border-orange-200",
+  EN_RIEGO: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  LISTO: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  ENTREGADO: "bg-green-100 text-green-800 border-green-300",
+  CANCELADO: "bg-red-50 text-red-700 border-red-200",
+};
+
+export const COLOR_ESTADO_ENTREGA: Record<EstadoEntrega, string> = {
+  PENDIENTE: "bg-neutral-100 text-neutral-700 border-neutral-300",
+  LISTO: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  EN_ENTREGA: "bg-purple-50 text-purple-700 border-purple-200",
+  ENTREGADO: "bg-green-100 text-green-800 border-green-300",
+  CANCELADO: "bg-red-50 text-red-700 border-red-200",
+};
+
+// Mensajes amigables para el tracker público (Fase 4) y para notas
+// automáticas del historial — se centralizan aquí para no repetir el texto
+// en varios lugares.
+export const MENSAJE_ESTADO_PEDIDO: Partial<Record<EstadoPedido, string>> = {
+  EN_PRODUCCION:
+    "🏭 Estamos fabricando tu pedido. Nuestro equipo está trabajando en él.",
+  EN_SECADO: "☀️ Tu pedido se encuentra en proceso de secado.",
+  EN_RIEGO:
+    "💧 Tu pedido está recibiendo el tratamiento necesario antes de ser entregado.",
+  LISTO: "🎉 ¡Tu pedido está listo!",
+  ENTREGADO:
+    "📦 Tu pedido ha sido entregado. ¡Gracias por confiar en La Mera Fábrica!",
+};
+
+export type ClienteResumen = {
+  id: string;
+  nombre: string;
+  telefono: string;
+};
+
+/** Un ítem dentro del formulario de creación/edición de un pedido. */
+export type ItemPedidoFormulario = {
+  productoId: string;
+  nombre: string;
+  categoria: string | null;
+  diseno: string | null;
+  color: string | null;
+  cantidad: number;
+  precioUnitario: number;
+};

@@ -88,12 +88,23 @@ model Producto {
   //   moldura: { longitudPiezaCm, perfilMm, altoMm }
   especificaciones Json?
 
+  // Precio de venta actual. NUNCA se usa directo en un pedido ya creado —
+  // ItemPedido.precioUnitario guarda su propia copia congelada (ver el
+  // sistema de gestion, Fase 2).
+  precioActual Decimal? @db.Decimal(10, 2)
+
   imagenes ImagenProducto[]
 
   relacionadoDesde ProductoRelacionado[] @relation("ProductoOrigen")
   relacionadoHacia ProductoRelacionado[] @relation("ProductoDestino")
 
   itemsCotizacion ItemCotizacion[]
+
+  // Sistema de gestion (pedidos internos, distintos de las cotizaciones
+  // del sitio publico)
+  itemsPedido         ItemPedido[]
+  pagoUnitario        PagoUnitarioProducto?
+  registrosProduccion RegistroProduccion[]
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -245,6 +256,12 @@ model Configuracion {
   mapaUrl           String?
   facebookUrl       String?
   instagramUrl      String?
+
+  // Sistema de gestion: monto configurable de mezcla (hoy L.130). Se copia
+  // a RegistroMezcla.monto en cada registro nuevo -- cambiarlo aqui no
+  // altera registros pasados.
+  montoMezclaActual Decimal? @db.Decimal(10, 2)
+
   actualizadoEn     DateTime @updatedAt
 
   @@map("configuracion")
@@ -269,7 +286,429 @@ model AdminUsuario {
   email      String   @unique
   rol        RolAdmin @default(ADMIN)
   activo     Boolean  @default(true)
+
+  // Sistema de gestion: quien hizo cada cambio de estado / cada riego
+  cambiosEstadoPedido HistorialEstadoPedido[]
+  riegosRegistrados   RegistroRiego[]
+
   creadoEn   DateTime @default(now())
 
   @@map("admin_usuarios")
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de gestion -- Pedidos
+// ---------------------------------------------------------------------------
+// Todo lo que sigue es aditivo (Fase 2 del sistema de gestion, aprobada por
+// el usuario 2026-08-25): no modifica ninguna tabla/columna del catalogo o
+// del sitio publico que ya existia arriba.
+
+enum EstadoPedido {
+  PEDIDO_RECIBIDO
+  EN_PRODUCCION
+  EN_SECADO
+  EN_RIEGO
+  LISTO
+  ENTREGADO
+  CANCELADO
+}
+
+enum EstadoEntrega {
+  PENDIENTE
+  LISTO
+  EN_ENTREGA
+  ENTREGADO
+  CANCELADO
+}
+
+model Cliente {
+  id            String   @id @default(cuid())
+  nombre        String
+  telefono      String
+  notas         String?
+  pedidos       Pedido[]
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@map("clientes")
+}
+
+// montoTotal / montoAnticipo / saldoPendiente son columnas calculadas por la
+// aplicacion a partir de los ItemPedido y el porcentajeAnticipo -- no se
+// recalculan "al vuelo" en cada lectura. Cualquier cambio a los items o al
+// porcentaje de anticipo debe recalcular estos tres campos en la misma
+// operacion (ver src/lib/pedidoTotales.ts).
+model Pedido {
+  id                 String                  @id @default(cuid())
+  codigo             String                  @unique
+  clienteId          String
+  cliente            Cliente                 @relation(fields: [clienteId], references: [id])
+  fechaPrometida     DateTime?
+  fechaEntregaReal   DateTime?
+  porcentajeAnticipo Decimal                 @default(60) @db.Decimal(5, 2)
+  montoAnticipo      Decimal                 @db.Decimal(10, 2)
+  montoTotal         Decimal                 @db.Decimal(10, 2)
+  saldoPendiente     Decimal                 @db.Decimal(10, 2)
+  estado             EstadoPedido            @default(PEDIDO_RECIBIDO)
+  // Se guarda sola al pasar a EN_SECADO -- de ahi se calculan los "dias de
+  // secado transcurridos" en hora de Honduras (ver src/lib/fecha.ts).
+  fechaInicioSecado  DateTime?
+  notas              String?
+  items              ItemPedido[]
+  historial          HistorialEstadoPedido[]
+  riegos             RegistroRiego[]
+  entregas           Entrega[]
+  ingresos           Ingreso[]
+  creadoEn           DateTime                @default(now())
+  actualizadoEn      DateTime                @updatedAt
+
+  @@index([estado])
+  @@index([clienteId])
+  @@map("pedidos")
+}
+
+model ItemPedido {
+  id       String @id @default(cuid())
+  pedidoId String
+  pedido   Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  // Sin cascada hacia Producto (igual que ItemCotizacion): borrar un
+  // producto no debe borrar el historial de pedidos que lo usaron.
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+
+  // Copiados del producto al crear el pedido -- nunca se leen "en vivo"
+  // desde Producto despues de este punto.
+  categoria String?
+  diseno    String?
+  color     String?
+
+  cantidad       Decimal @db.Decimal(10, 2)
+  // Snapshot historico: el precio del producto el dia del pedido.
+  precioUnitario Decimal @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
+
+  @@index([pedidoId])
+  @@map("items_pedido")
+}
+
+model HistorialEstadoPedido {
+  id             String       @id @default(cuid())
+  pedidoId       String
+  pedido         Pedido       @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  estado         EstadoPedido
+  adminUsuarioId String
+  adminUsuario   AdminUsuario @relation(fields: [adminUsuarioId], references: [id])
+  notas          String?
+  creadoEn       DateTime     @default(now())
+
+  @@index([pedidoId])
+  @@map("historial_estado_pedido")
+}
+
+// El riego lo hace personalmente el administrador (nunca empleados).
+model RegistroRiego {
+  id             String       @id @default(cuid())
+  pedidoId       String
+  pedido         Pedido       @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  adminUsuarioId String
+  adminUsuario   AdminUsuario @relation(fields: [adminUsuarioId], references: [id])
+  observacion    String?
+  creadoEn       DateTime     @default(now())
+
+  @@index([pedidoId])
+  @@map("registros_riego")
+}
+
+// Un evento de entrega concreto. Lo normal es una sola fila por pedido;
+// solo hay mas de una si el pedido se reparte en tandas (confirmado por el
+// usuario 2026-08-25).
+model Entrega {
+  id              String        @id @default(cuid())
+  pedidoId        String
+  pedido          Pedido        @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  fechaProgramada DateTime?
+  fechaReal       DateTime?
+  estado          EstadoEntrega @default(PENDIENTE)
+  notas           String?
+  creadoEn        DateTime      @default(now())
+  actualizadoEn   DateTime      @updatedAt
+
+  @@index([pedidoId])
+  @@map("entregas")
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de gestion -- Empleados y produccion
+// ---------------------------------------------------------------------------
+
+enum EstadoPagoSemanal {
+  PENDIENTE
+  PAGADO
+}
+
+model Empleado {
+  id            String              @id @default(cuid())
+  nombre        String
+  telefono      String?
+  activo        Boolean             @default(true)
+  notas         String?
+  fechaIngreso  DateTime?
+  producciones  RegistroProduccion[]
+  mezclas       RegistroMezcla[]
+  extras        PagoExtraEmpleado[]
+  pagos         PagoEmpleado[]
+  creadoEn      DateTime            @default(now())
+  actualizadoEn DateTime            @updatedAt
+
+  @@map("empleados")
+}
+
+// Valor actual configurable por producto/diseno. Al crear un
+// RegistroProduccion se copia este monto -- cambiarlo despues no altera
+// registros ya creados.
+model PagoUnitarioProducto {
+  id            String   @id @default(cuid())
+  productoId    String   @unique
+  producto      Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  monto         Decimal  @db.Decimal(10, 2)
+  actualizadoEn DateTime @updatedAt
+
+  @@map("pago_unitario_producto")
+}
+
+model RegistroProduccion {
+  id                  String   @id @default(cuid())
+  fecha               DateTime @default(now())
+  empleadoId          String
+  empleado            Empleado @relation(fields: [empleadoId], references: [id])
+  productoId          String
+  producto            Producto @relation(fields: [productoId], references: [id])
+  cantidadProducida   Int
+  unidadesDefectuosas Int      @default(0)
+  // Snapshot: copiado de PagoUnitarioProducto al momento del registro.
+  pagoUnitario        Decimal  @db.Decimal(10, 2)
+  totalGanado         Decimal  @db.Decimal(10, 2)
+  notas               String?
+  creadoEn            DateTime @default(now())
+
+  @@index([empleadoId])
+  @@index([fecha])
+  @@map("registros_produccion")
+}
+
+// Hoy solo un empleado hace mezcla, pero no se restringe a nivel de schema.
+model RegistroMezcla {
+  id         String   @id @default(cuid())
+  empleadoId String
+  empleado   Empleado @relation(fields: [empleadoId], references: [id])
+  fecha      DateTime @default(now())
+  // Snapshot de Configuracion.montoMezclaActual al momento del registro.
+  monto      Decimal  @db.Decimal(10, 2)
+  notas      String?
+  creadoEn   DateTime @default(now())
+
+  @@index([empleadoId])
+  @@map("registros_mezcla")
+}
+
+// Catalogo configurable de tipos de extra (ej: "Cargar pedido al camion").
+model TipoPagoExtra {
+  id            String              @id @default(cuid())
+  descripcion   String
+  montoSugerido Decimal?            @db.Decimal(10, 2)
+  activo        Boolean             @default(true)
+  extras        PagoExtraEmpleado[]
+
+  @@map("tipos_pago_extra")
+}
+
+model PagoExtraEmpleado {
+  id              String         @id @default(cuid())
+  empleadoId      String
+  empleado        Empleado       @relation(fields: [empleadoId], references: [id])
+  tipoPagoExtraId String?
+  tipoPagoExtra   TipoPagoExtra? @relation(fields: [tipoPagoExtraId], references: [id])
+  fecha           DateTime       @default(now())
+  // Copiada (no se lee en vivo de TipoPagoExtra), igual que el monto.
+  descripcion     String
+  monto           Decimal        @db.Decimal(10, 2)
+  notas           String?
+  creadoEn        DateTime       @default(now())
+
+  @@index([empleadoId])
+  @@map("pagos_extra_empleado")
+}
+
+model PagoEmpleado {
+  id              String            @id @default(cuid())
+  empleadoId      String
+  empleado        Empleado          @relation(fields: [empleadoId], references: [id])
+  semanaInicio    DateTime
+  semanaFin       DateTime
+  totalProduccion Decimal           @db.Decimal(10, 2)
+  totalMezcla     Decimal           @db.Decimal(10, 2)
+  totalExtras     Decimal           @db.Decimal(10, 2)
+  totalGanado     Decimal           @db.Decimal(10, 2)
+  estado          EstadoPagoSemanal @default(PENDIENTE)
+  fechaPago       DateTime?
+  montoPagado     Decimal?          @db.Decimal(10, 2)
+  notas           String?
+  creadoEn        DateTime          @default(now())
+  actualizadoEn   DateTime          @updatedAt
+
+  @@unique([empleadoId, semanaInicio])
+  @@map("pagos_empleado")
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de gestion -- Inventario
+// ---------------------------------------------------------------------------
+
+enum TipoMovimientoInventario {
+  ENTRADA
+  SALIDA
+}
+
+model Proveedor {
+  id         String               @id @default(cuid())
+  nombre     String
+  telefono   String?
+  notas      String?
+  activo     Boolean              @default(true)
+  materiales MaterialInventario[]
+  compras    Compra[]
+  creadoEn   DateTime             @default(now())
+
+  @@map("proveedores")
+}
+
+model MaterialInventario {
+  id             String                 @id @default(cuid())
+  nombre         String
+  // Unidad base en la que se lleva el stock (cantidadActual/cantidadMinima).
+  // Ej: "kg".
+  unidadMedida   String
+  // Cuanta unidadMedida trae cada "unidad" de compra/movimiento. Ej: si se
+  // compra cemento en bolsas de 42.5kg, unidadMedida="kg" y
+  // cantidadPorUnidad=42.5 -- asi el admin registra movimientos contando
+  // bolsas (como compra de verdad) y el sistema calcula el stock real en kg.
+  // Si no aplica conversion (se compra y se usa en la misma unidad), queda
+  // en 1.
+  cantidadPorUnidad Decimal             @default(1) @db.Decimal(10, 2)
+  cantidadActual Decimal                @default(0) @db.Decimal(10, 2)
+  cantidadMinima Decimal                @default(0) @db.Decimal(10, 2)
+  costo          Decimal?               @db.Decimal(10, 2)
+  proveedorId    String?
+  proveedor      Proveedor?             @relation(fields: [proveedorId], references: [id])
+  activo         Boolean                @default(true)
+  notas          String?
+  movimientos    MovimientoInventario[]
+  creadoEn       DateTime               @default(now())
+  actualizadoEn  DateTime               @updatedAt
+
+  @@map("materiales_inventario")
+}
+
+// Las salidas son manuales -- no se descuenta automatico por produccion.
+model MovimientoInventario {
+  id         String                   @id @default(cuid())
+  materialId String
+  material   MaterialInventario       @relation(fields: [materialId], references: [id])
+  tipo       TipoMovimientoInventario
+  // Cantidad en "unidades de compra" (ej: bolsas), no en unidadMedida.
+  cantidad   Decimal                  @db.Decimal(10, 2)
+  // Snapshot de MaterialInventario.cantidadPorUnidad al momento del
+  // movimiento (mismo criterio de snapshot que el resto del proyecto) --
+  // si despues cambia el tamano de la presentacion, los movimientos viejos
+  // no se reinterpretan. cantidad * cantidadPorUnidad = cuanto se
+  // sumo/resto del stock real (en unidadMedida) en este movimiento.
+  cantidadPorUnidad Decimal             @default(1) @db.Decimal(10, 2)
+  fecha      DateTime                 @default(now())
+  compraId   String?
+  compra     Compra?                  @relation(fields: [compraId], references: [id])
+  // Costo por unidad de compra (ej: por bolsa), no por unidadMedida.
+  costo      Decimal?                 @db.Decimal(10, 2)
+  referencia String?
+  motivo     String?
+  notas      String?
+
+  @@index([materialId])
+  @@map("movimientos_inventario")
+}
+
+model Compra {
+  id          String                 @id @default(cuid())
+  proveedorId String
+  proveedor   Proveedor              @relation(fields: [proveedorId], references: [id])
+  fecha       DateTime               @default(now())
+  montoTotal  Decimal                @db.Decimal(10, 2)
+  notas       String?
+  movimientos MovimientoInventario[]
+
+  @@map("compras")
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de gestion -- Finanzas
+// ---------------------------------------------------------------------------
+
+enum TipoIngreso {
+  VENTA
+  ANTICIPO
+  PAGO_FINAL
+  OTRO
+}
+
+enum TipoGasto {
+  MATERIALES
+  EMPLEADOS
+  COMBUSTIBLE
+  ELECTRICIDAD
+  AGUA
+  MANTENIMIENTO
+  TRANSPORTE
+  REPARACIONES
+  OTROS
+}
+
+model Ingreso {
+  id          String      @id @default(cuid())
+  categoria   TipoIngreso
+  monto       Decimal     @db.Decimal(10, 2)
+  fecha       DateTime    @default(now())
+  pedidoId    String?
+  pedido      Pedido?     @relation(fields: [pedidoId], references: [id])
+  descripcion String?
+  notas       String?
+
+  @@index([fecha])
+  @@map("ingresos")
+}
+
+model Gasto {
+  id          String    @id @default(cuid())
+  categoria   TipoGasto
+  monto       Decimal   @db.Decimal(10, 2)
+  fecha       DateTime  @default(now())
+  descripcion String?
+  notas       String?
+
+  @@index([fecha])
+  @@map("gastos")
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de gestion -- Mensajeria
+// ---------------------------------------------------------------------------
+
+model PlantillaMensaje {
+  id            String   @id @default(cuid())
+  clave         String   @unique
+  nombre        String
+  cuerpo        String
+  activo        Boolean  @default(true)
+  actualizadoEn DateTime @updatedAt
+
+  @@map("plantillas_mensaje")
 }
