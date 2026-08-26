@@ -24,7 +24,7 @@ export default async function ProtectedAdminLayout({
 
   return (
     <ToastProvider>
-      <div className="flex min-h-screen bg-neutral-50">
+      <div className="flex min-h-screen flex-col bg-neutral-50 md:flex-row">
         <AdminNav userEmail={user.email ?? ""} signOutAction={signOut} />
         <div className="min-w-0 flex-1">
           <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
