@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { rangoDiaHonduras } from "@/lib/fecha";
+import { requireRolAdmin } from "@/lib/supabase/adminUsuario";
 
 export const metadata = { title: "Inicio — Panel administrativo" };
 
 export default async function AdminDashboardPage() {
+  // El dashboard muestra estadisticas de TODO el negocio (cotizaciones,
+  // clientes, contenido del sitio, etc.) -- fuera del alcance de un
+  // AdminUsuario con rol EMPLEADO. Se redirige a su seccion de entrada en
+  // vez de mostrarle un resumen que no le corresponde.
+  await requireRolAdmin();
+
   const { inicio: hoyInicio, fin: hoyFin } = rangoDiaHonduras();
 
   const [

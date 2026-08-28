@@ -20,6 +20,7 @@ export function NuevoRegistroProduccionForm({
   const [empleadoId, setEmpleadoId] = useState("");
   const [productoId, setProductoId] = useState("");
   const [hizoMezcla, setHizoMezcla] = useState(false);
+  const [mostrarNotas, setMostrarNotas] = useState(false);
 
   const opcionesEmpleado = useMemo(
     () => empleados.map((e) => ({ id: e.id, etiqueta: e.nombre })),
@@ -37,17 +38,17 @@ export function NuevoRegistroProduccionForm({
   return (
     <form action={formAction} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label className="text-xs text-neutral-500">
-        Empleado
+        ¿Quién trabajó?
         <Combobox
           opciones={opcionesEmpleado}
           valorId={empleadoId}
           onSeleccionar={setEmpleadoId}
-          placeholder="Escribe para buscar…"
+          placeholder="Escribe el nombre…"
           className={`${inputClass} mt-1`}
         />
       </label>
       <label className="text-xs text-neutral-500">
-        Producto
+        ¿Qué producto hizo?
         <Combobox
           opciones={opcionesProducto}
           valorId={productoId}
@@ -57,7 +58,7 @@ export function NuevoRegistroProduccionForm({
         />
       </label>
       <label className="text-xs text-neutral-500">
-        Cantidad producida{!productoId && " (si va a registrar producción)"}
+        ¿Cuántas piezas hizo?{!productoId && " (si va a registrar producción)"}
         <input
           type="number"
           name="cantidadProducida"
@@ -67,7 +68,7 @@ export function NuevoRegistroProduccionForm({
         />
       </label>
       <label className="text-xs text-neutral-500">
-        Unidades defectuosas (opcional)
+        ¿Cuántas salieron malas? (opcional)
         <input
           type="number"
           name="unidadesDefectuosas"
@@ -77,10 +78,20 @@ export function NuevoRegistroProduccionForm({
           className={`${inputClass} mt-1`}
         />
       </label>
-      <label className="text-xs text-neutral-500 sm:col-span-2">
-        Notas (opcional)
-        <textarea name="notas" rows={2} className={`${inputClass} mt-1`} />
-      </label>
+      {mostrarNotas ? (
+        <label className="text-xs text-neutral-500 sm:col-span-2">
+          Notas (opcional)
+          <textarea name="notas" rows={2} className={`${inputClass} mt-1`} />
+        </label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setMostrarNotas(true)}
+          className="text-left text-xs font-medium text-neutral-500 hover:text-neutral-800 hover:underline sm:col-span-2"
+        >
+          + Agregar una nota (opcional)
+        </button>
+      )}
 
       <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 sm:col-span-2">
         <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">

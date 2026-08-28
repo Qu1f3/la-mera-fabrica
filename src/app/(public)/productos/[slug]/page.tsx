@@ -38,7 +38,7 @@ export async function generateMetadata({
     `${ETIQUETA_TIPO[producto.tipo]} ${producto.nombre} — La Mera Fábrica.`;
 
   return {
-    title: `${producto.nombre} — La Mera Fábrica`,
+    title: producto.nombre,
     description: descripcion,
     openGraph: {
       title: producto.nombre,

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { CotizacionClient } from "./CotizacionClient";
 
 export const metadata: Metadata = {
-  title: "Tu cotización — La Mera Fábrica",
+  title: "Tu cotización",
   robots: { index: false, follow: false },
 };
 

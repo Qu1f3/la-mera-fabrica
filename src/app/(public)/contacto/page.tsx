@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { WhatsAppButton } from "@/components/catalogo/WhatsAppButton";
 
 export const metadata: Metadata = {
-  title: "Contacto — La Mera Fábrica",
+  title: "Contacto",
   description:
     "Contacta a La Mera Fábrica por WhatsApp para cotizaciones de mosaicos y molduras para piso en Nacaome, Valle, Honduras.",
 };

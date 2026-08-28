@@ -137,6 +137,19 @@ export default async function PublicLayout({
             )}
           </div>
         </div>
+        <div className="border-t border-neutral-200 px-4 py-4 text-xs text-piedra sm:px-6">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
+            <p>© {new Date().getFullYear()} La Mera Fábrica</p>
+            <nav className="flex flex-wrap gap-x-4 gap-y-1">
+              <Link href="/politica-de-privacidad" className="hover:text-terracota">
+                Política de Privacidad
+              </Link>
+              <Link href="/terminos-y-condiciones" className="hover:text-terracota">
+                Términos y Condiciones
+              </Link>
+            </nav>
+          </div>
+        </div>
       </footer>
     </div>
   );

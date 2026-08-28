@@ -3,7 +3,7 @@ import { listFaqsActivas } from "@/lib/data/contenido";
 import { construirFaqJsonLd, jsonLdSeguro } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
-  title: "Preguntas frecuentes — La Mera Fábrica",
+  title: "Preguntas frecuentes",
   description:
     "Respuestas a las preguntas más comunes sobre nuestros mosaicos y molduras para piso.",
 };

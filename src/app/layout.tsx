@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -54,6 +55,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Analítica opcional: mientras no configures NEXT_PUBLIC_GA_ID, no
             se carga ningún script ni se manda ningún dato a nadie. */}
         {gaId && <GoogleAnalytics gaId={gaId} />}
+        {/* Vercel Analytics: mide visitas de forma anónima y sin cookies.
+            Solo recolecta datos cuando el sitio corre desplegado en Vercel
+            (en desarrollo local no manda nada) -- no requiere configuración
+            ni variable de entorno, a diferencia de Google Analytics arriba. */}
+        <Analytics />
       </body>
     </html>
   );

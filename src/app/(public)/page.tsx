@@ -13,8 +13,15 @@ import { Paginacion } from "@/components/catalogo/Paginacion";
 import { BannerStrip } from "@/components/contenido/BannerStrip";
 import { TestimoniosSection } from "@/components/contenido/TestimoniosSection";
 
+// Sin `title` a propósito: el layout raíz (src/app/layout.tsx) ya define
+// `default: "La Mera Fábrica — Mosaicos y molduras para piso"` para cuando
+// una página no pone su propio título -- exactamente este caso. Si esta
+// página pusiera su propio `title`, el `template` del layout raíz
+// ("%s — La Mera Fábrica") se lo aplicaría IGUAL, duplicando el nombre de
+// la marca al final (bug real encontrado y corregido en esta ronda de
+// pulido -- afectaba a todas las páginas públicas, ver commit de esta
+// fecha en la memoria del proyecto).
 export const metadata: Metadata = {
-  title: "La Mera Fábrica — Mosaicos y molduras para piso",
   description:
     "Mosaicos y molduras para piso en Nacaome, Valle, Honduras. Explora el catálogo por tipo, estilo, acabado y aplicación, y solicita cotización por WhatsApp.",
 };

@@ -3,9 +3,9 @@ import Image from "next/image";
 import { getSeccionNosotros } from "@/lib/data/contenido";
 
 export const metadata: Metadata = {
-  title: "Nosotros — La Mera Fábrica",
+  title: "Nosotros",
   description:
-    "Conoce La Mera Fábrica, mosaicos y molduras para piso en Nacaome, Valle, Honduras.",
+    "Conoce la historia y el equipo detrás de La Mera Fábrica, fabricantes de mosaicos y molduras para piso en Nacaome, Valle, Honduras.",
 };
 
 // Contenido que casi nunca cambia — se sirve cacheado hasta 5 minutos en

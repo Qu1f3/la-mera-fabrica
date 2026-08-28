@@ -10,6 +10,8 @@ import { crearSolicitudCotizacion } from "./actions";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-terracota focus:outline-none";
+const inputClassError =
+  "mt-1 w-full rounded-md border border-red-400 px-3 py-2 text-sm text-neutral-900 focus:border-red-500 focus:outline-none";
 
 export function CotizacionClient() {
   const { items, actualizarCantidad, quitarItem, vaciar } = useCart();
@@ -19,11 +21,47 @@ export function CotizacionClient() {
   const [notas, setNotas] = useState("");
   const [sitioWeb, setSitioWeb] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [erroresCampo, setErroresCampo] = useState<{
+    nombre?: string;
+    telefono?: string;
+    email?: string;
+  }>({});
   const [pending, startTransition] = useTransition();
+  // Se activa justo antes de mandar al cliente a WhatsApp (o a la página de
+  // gracias) para que vea una confirmación clara de que su solicitud sí se
+  // guardó, en vez de un salto instantáneo de página que puede sentirse
+  // como que "no pasó nada" si el navegador tarda un poco en cambiar de
+  // pestaña/app.
+  const [enviado, setEnviado] = useState(false);
+
+  const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Mensajes idénticos a los que devuelve crearSolicitudCotizacion (ver
+  // actions.ts) para nombre/teléfono vacíos -- se validan primero en el
+  // cliente (con borde rojo + mensaje puntual bajo el campo específico, en
+  // vez del tooltip nativo del navegador o de un solo mensaje genérico), y
+  // el servidor los vuelve a validar igual como red de seguridad si alguien
+  // llega a saltarse la validación del cliente.
+  function validarCampos(): boolean {
+    const nuevosErrores: typeof erroresCampo = {};
+    if (!nombreCliente.trim()) {
+      nuevosErrores.nombre = "Escribe tu nombre.";
+    }
+    if (!telefono.trim()) {
+      nuevosErrores.telefono = "Escribe un teléfono de contacto.";
+    }
+    if (email.trim() && !REGEX_EMAIL.test(email.trim())) {
+      nuevosErrores.email = "Ese correo no se ve válido.";
+    }
+    setErroresCampo(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  }
 
   function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+
+    if (!validarCampos()) return;
 
     startTransition(async () => {
       const resultado = await crearSolicitudCotizacion(
@@ -40,17 +78,60 @@ export function CotizacionClient() {
       );
 
       if (!resultado.ok) {
-        setError(resultado.error);
+        // Si el servidor devuelve el mismo mensaje de nombre/teléfono vacío
+        // (red de seguridad si alguien saltó la validación del cliente),
+        // se muestra bajo el campo correspondiente en vez de como mensaje
+        // genérico -- para todo lo demás (carrito vacío, límite de envíos)
+        // el mensaje genérico sigue siendo el lugar correcto.
+        if (resultado.error === "Escribe tu nombre.") {
+          setErroresCampo((previo) => ({ ...previo, nombre: resultado.error }));
+        } else if (resultado.error === "Escribe un teléfono de contacto.") {
+          setErroresCampo((previo) => ({ ...previo, telefono: resultado.error }));
+        } else {
+          setError(resultado.error);
+        }
         return;
       }
 
       trackEvent("enviar_cotizacion", { items_count: items.length });
       vaciar();
+      setEnviado(true);
 
-      // Navegación directa (no window.open) para evitar que el navegador la
-      // bloquee como pop-up: ya pasó tiempo async desde el clic original.
-      window.location.href = resultado.whatsappUrl ?? "/cotizacion/gracias";
+      // Pequeña pausa para que la confirmación de abajo alcance a verse
+      // antes de salir de la página. Navegación directa (no window.open)
+      // para evitar que el navegador la bloquee como pop-up: ya pasó tiempo
+      // async desde el clic original.
+      setTimeout(() => {
+        window.location.href = resultado.whatsappUrl ?? "/cotizacion/gracias";
+      }, 900);
     });
+  }
+
+  if (enviado) {
+    return (
+      <main className="mx-auto max-w-xl px-4 py-24 text-center sm:px-6">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-6 w-6"
+            aria-hidden="true"
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </div>
+        <h1 className="mt-4 text-2xl font-semibold text-carbon">
+          ¡Listo! Recibimos tu solicitud
+        </h1>
+        <p className="mt-2 text-sm text-piedra">
+          Te estamos llevando a WhatsApp para confirmar los detalles…
+        </p>
+      </main>
+    );
   }
 
   if (items.length === 0) {
@@ -171,6 +252,7 @@ export function CotizacionClient() {
 
       <form
         onSubmit={enviar}
+        noValidate
         className="mt-8 space-y-4 rounded-lg border border-neutral-200 bg-white p-5"
       >
         <h2 className="text-sm font-semibold text-carbon">Tus datos</h2>
@@ -200,29 +282,60 @@ export function CotizacionClient() {
           <label className="block text-sm text-piedra">
             Nombre *
             <input
-              required
               value={nombreCliente}
-              onChange={(evento) => setNombreCliente(evento.target.value)}
-              className={inputClass}
+              onChange={(evento) => {
+                setNombreCliente(evento.target.value);
+                if (erroresCampo.nombre) {
+                  setErroresCampo((previo) => ({ ...previo, nombre: undefined }));
+                }
+              }}
+              aria-invalid={Boolean(erroresCampo.nombre)}
+              className={erroresCampo.nombre ? inputClassError : inputClass}
             />
+            {erroresCampo.nombre && (
+              <span className="mt-1 block text-xs text-red-600">
+                {erroresCampo.nombre}
+              </span>
+            )}
           </label>
           <label className="block text-sm text-piedra">
             Teléfono *
             <input
-              required
               value={telefono}
-              onChange={(evento) => setTelefono(evento.target.value)}
-              className={inputClass}
+              onChange={(evento) => {
+                setTelefono(evento.target.value);
+                if (erroresCampo.telefono) {
+                  setErroresCampo((previo) => ({ ...previo, telefono: undefined }));
+                }
+              }}
+              aria-invalid={Boolean(erroresCampo.telefono)}
+              className={erroresCampo.telefono ? inputClassError : inputClass}
             />
+            {erroresCampo.telefono && (
+              <span className="mt-1 block text-xs text-red-600">
+                {erroresCampo.telefono}
+              </span>
+            )}
           </label>
           <label className="block text-sm text-piedra sm:col-span-2">
             Correo (opcional)
             <input
               type="email"
               value={email}
-              onChange={(evento) => setEmail(evento.target.value)}
-              className={inputClass}
+              onChange={(evento) => {
+                setEmail(evento.target.value);
+                if (erroresCampo.email) {
+                  setErroresCampo((previo) => ({ ...previo, email: undefined }));
+                }
+              }}
+              aria-invalid={Boolean(erroresCampo.email)}
+              className={erroresCampo.email ? inputClassError : inputClass}
             />
+            {erroresCampo.email && (
+              <span className="mt-1 block text-xs text-red-600">
+                {erroresCampo.email}
+              </span>
+            )}
           </label>
           <label className="block text-sm text-piedra sm:col-span-2">
             Notas (opcional)

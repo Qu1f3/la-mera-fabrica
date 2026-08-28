@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Estado de tu pedido — La Mera Fábrica",
+  title: "Estado de tu pedido",
   description:
     "Consulta el estado de tu pedido en Ladrillera La Mera Fábrica con el código que te enviamos por WhatsApp.",
 };

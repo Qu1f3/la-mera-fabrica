@@ -21,7 +21,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { codigo } = await params;
   return {
-    title: `Pedido ${codigo.toUpperCase()} — La Mera Fábrica`,
+    title: `Pedido ${codigo.toUpperCase()}`,
     // No indexar: son páginas privadas por código, no contenido para buscar.
     robots: { index: false, follow: false },
   };

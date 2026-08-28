@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase/server";
+import { obtenerAdminUsuario } from "@/lib/supabase/adminUsuario";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { formatearFechaHonduras } from "@/lib/fecha";
 import { eliminarRegistroProduccion, eliminarRegistroMezcla } from "./actions";
@@ -13,6 +15,17 @@ export default async function ProduccionPage({
 }) {
   const { empleadoId } = await searchParams;
   const filtroEmpleadoId = (empleadoId || "").trim();
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  // "Pago por unidad" es una decisión del dueño (cuánto se le paga a cada
+  // empleado por pieza) -- no algo que un EMPLEADO necesite tocar día a
+  // día, así que ese enlace solo se muestra si el rol es ADMIN. Mismo
+  // patrón que "Administrar tipos de pago" en Extras.
+  const adminUsuario = user ? await obtenerAdminUsuario(user) : null;
+  const esAdmin = adminUsuario?.rol === "ADMIN";
 
   const [registros, registrosMezcla, empleados] = await Promise.all([
     prisma.registroProduccion.findMany({
@@ -49,12 +62,14 @@ export default async function ProduccionPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/produccion/pago-unitario"
-            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-          >
-            Pago por unidad
-          </Link>
+          {esAdmin && (
+            <Link
+              href="/admin/produccion/pago-unitario"
+              className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+            >
+              Pago por unidad
+            </Link>
+          )}
           <Link
             href="/admin/produccion/nuevo"
             className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"

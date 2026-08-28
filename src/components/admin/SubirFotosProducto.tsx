@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, type FormEvent } from "react";
-import { subirImagenesProducto } from "@/app/admin/(protected)/productos/actions";
+import { subirImagenesProducto } from "@/app/admin/(protected)/(solo-dueno)/productos/actions";
 import { comprimirImagen } from "@/lib/img/comprimirImagen";
 
 /**

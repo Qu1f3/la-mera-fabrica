@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { crearPedido } from "../actions";
-import { crearClienteInline } from "../../clientes/actions";
+import { crearClienteInline } from "../../(solo-dueno)/clientes/actions";
 import { calcularSubtotal, calcularTotalesPedido, type EntradaAnticipo } from "@/lib/pedidoTotales";
 import { Combobox } from "@/components/admin/ui/Combobox";
 import { claveDiaHonduras } from "@/lib/fecha";

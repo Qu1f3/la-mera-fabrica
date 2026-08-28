@@ -27,6 +27,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.4,
     },
+    {
+      url: `${SITE_URL}/politica-de-privacidad`,
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
+    {
+      url: `${SITE_URL}/terminos-y-condiciones`,
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
   ];
 
   const paginasProducto: MetadataRoute.Sitemap = productos.map((p: { slug: string; actualizadoEn: Date }) => ({

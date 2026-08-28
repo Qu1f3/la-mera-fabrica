@@ -100,7 +100,16 @@ export function AgregarCotizacionButton({
           />
         </div>
       )}
-      <div className="flex items-center gap-2">
+      {/*
+        `flex-wrap` + `min-w-[88px]` en el botón: en una tarjeta angosta de
+        catálogo (grid de 2 columnas en móvil), input + unidad + botón no
+        siempre caben en una sola fila -- sin esto, el botón "Agregar" se
+        salía del borde de la tarjeta en vez de acomodarse (bug real
+        encontrado probando el catálogo a 360px de ancho). Con flex-wrap, si
+        no caben los tres en una fila el botón pasa a su propia línea
+        completa en vez de desbordarse.
+      */}
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="number"
           min={0.5}
@@ -117,7 +126,7 @@ export function AgregarCotizacionButton({
         <button
           type="button"
           onClick={agregar}
-          className={`flex-1 rounded-md bg-terracota font-medium text-white transition-colors hover:bg-terracota-dark ${
+          className={`min-w-[88px] flex-1 rounded-md bg-terracota font-medium text-white transition-colors hover:bg-terracota-dark ${
             compacto ? "px-2 py-2 text-sm" : "px-4 py-2.5 text-sm"
           }`}
         >

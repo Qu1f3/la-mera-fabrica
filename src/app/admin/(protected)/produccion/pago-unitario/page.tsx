@@ -1,10 +1,20 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireRolAdmin } from "@/lib/supabase/adminUsuario";
 import { PagoUnitarioRow } from "./PagoUnitarioRow";
 
 export const metadata = { title: "Pago por unidad — Panel administrativo" };
 
 export default async function PagoUnitarioPage() {
+  // Cuánto se le paga a cada empleado por pieza es una decisión del dueño,
+  // no una tarea de un EMPLEADO -- esta ruta vive fuera de
+  // (solo-dueno)/ (porque el resto de Producción SÍ le corresponde a un
+  // EMPLEADO), así que necesita su propio guard en vez de heredar el del
+  // route group. El enlace hacia acá desde /admin/produccion ya está
+  // escondido para no-ADMIN, pero esto bloquea también si alguien escribe
+  // la URL directamente.
+  await requireRolAdmin();
+
   const productos = await prisma.producto.findMany({
     include: { pagoUnitario: true },
     orderBy: { nombre: "asc" },

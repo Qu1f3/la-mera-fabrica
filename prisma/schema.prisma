@@ -273,18 +273,24 @@ model Configuracion {
 
 enum RolAdmin {
   ADMIN
+  EMPLEADO
 }
 
 // Perfil de aplicación para cada usuario de Supabase Auth con acceso al
-// panel. Hoy solo existe el rol ADMIN; el campo ya está listo para cuando
-// haga falta un segundo rol, sin tener que rediseñar la autenticación.
+// panel. ADMIN ve todo el panel; EMPLEADO es un "mini administrador" --
+// solo ve Pedidos, Producción, Extras, Pagos semanales, Inventario y
+// Reportes (ver el route group "(solo-dueno)" y AdminNav.tsx para dónde se
+// aplica ese límite). El default es EMPLEADO a propósito: si algún día se
+// crea una fila de AdminUsuario sin especificar rol (a mano, por otro
+// código, etc.), que falle "cerrado" -- de menos acceso, nunca de más -- en
+// vez de dar acceso total a alguien por accidente.
 // No es obligatorio para iniciar sesión en la Fase 1 (ver src/lib/supabase/proxy.ts).
 model AdminUsuario {
   id         String   @id @default(cuid())
   authUserId String   @unique
   nombre     String
   email      String   @unique
-  rol        RolAdmin @default(ADMIN)
+  rol        RolAdmin @default(EMPLEADO)
   activo     Boolean  @default(true)
 
   // Sistema de gestion: quien hizo cada cambio de estado / cada riego

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { formatearFechaHonduras } from "@/lib/fecha";
+import { createClient } from "@/lib/supabase/server";
+import { obtenerAdminUsuario } from "@/lib/supabase/adminUsuario";
 import { EditarMaterialForm } from "./EditarMaterialForm";
 import {
   alternarActivoMaterial,
@@ -18,6 +20,16 @@ export default async function FichaMaterialPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  // Borrar un material para siempre es una acción irreversible que casi
+  // nunca hace falta en el día a día -- se esconde para que un EMPLEADO no
+  // la vea por accidente, igual que "Administrar tipos de pago" en Extras.
+  const adminUsuario = user ? await obtenerAdminUsuario(user) : null;
+  const esAdmin = adminUsuario?.rol === "ADMIN";
 
   const [material, proveedores] = await Promise.all([
     prisma.materialInventario.findUnique({
@@ -151,29 +163,31 @@ export default async function FichaMaterialPage({
         </div>
       </section>
 
-      <section className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-red-700">Zona de riesgo</h2>
-        {tieneMovimientos ? (
-          <p className="mt-1 text-sm text-neutral-600">
-            No se puede borrar: este material tiene movimientos registrados.
-            Usa &quot;Marcar inactivo&quot; en vez de borrarlo.
-          </p>
-        ) : (
-          <>
+      {esAdmin && (
+        <section className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-red-700">Zona de riesgo</h2>
+          {tieneMovimientos ? (
             <p className="mt-1 text-sm text-neutral-600">
-              Borrar este material no se puede deshacer.
+              No se puede borrar: este material tiene movimientos registrados.
+              Usa &quot;Marcar inactivo&quot; en vez de borrarlo.
             </p>
-            <form action={eliminarMaterial.bind(null, material.id)} className="mt-3">
-              <ConfirmSubmitButton
-                confirmMessage={`¿Borrar "${material.nombre}" para siempre? Esto no se puede deshacer.`}
-                className="rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
-              >
-                Borrar material
-              </ConfirmSubmitButton>
-            </form>
-          </>
-        )}
-      </section>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-neutral-600">
+                Borrar este material no se puede deshacer.
+              </p>
+              <form action={eliminarMaterial.bind(null, material.id)} className="mt-3">
+                <ConfirmSubmitButton
+                  confirmMessage={`¿Borrar "${material.nombre}" para siempre? Esto no se puede deshacer.`}
+                  className="rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                >
+                  Borrar material
+                </ConfirmSubmitButton>
+              </form>
+            </>
+          )}
+        </section>
+      )}
     </div>
   );
 }

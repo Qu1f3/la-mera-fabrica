@@ -42,6 +42,7 @@ export function NuevoMovimientoForm({
   const [proveedorId, setProveedorId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
+  const [mostrarNotas, setMostrarNotas] = useState(false);
 
   useEffect(() => {
     if (state.ok) onSuccess?.();
@@ -179,10 +180,20 @@ export function NuevoMovimientoForm({
           />
         </label>
       )}
-      <label className="text-xs text-neutral-500">
-        Notas (opcional)
-        <textarea name="notas" rows={2} className={`${inputClass} mt-1`} />
-      </label>
+      {mostrarNotas ? (
+        <label className="text-xs text-neutral-500">
+          Notas (opcional)
+          <textarea name="notas" rows={2} className={`${inputClass} mt-1`} />
+        </label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setMostrarNotas(true)}
+          className="text-left text-xs font-medium text-neutral-500 hover:text-neutral-800 hover:underline"
+        >
+          + Agregar una nota (opcional)
+        </button>
+      )}
 
       {tipo === "ENTRADA" && (
         <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">

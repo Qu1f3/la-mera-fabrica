@@ -4,9 +4,25 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import type { RolAdmin } from "@prisma/client";
 
 type Enlace = { href: string; label: string; icono: string };
 type Grupo = { titulo: string; enlaces: Enlace[] };
+
+// Secciones que SÍ puede ver un AdminUsuario con rol EMPLEADO (el "mini
+// administrador" -- ver src/lib/supabase/adminUsuario.ts). El bloqueo real
+// de las demás vive en "(solo-dueno)/layout.tsx"; esta lista es solo para
+// que el menú no le muestre enlaces a los que de todos modos no puede
+// entrar. Debe coincidir con las secciones que quedaron FUERA del route
+// group "(solo-dueno)".
+const RUTAS_EMPLEADO = [
+  "/admin/pedidos",
+  "/admin/produccion",
+  "/admin/extras",
+  "/admin/pagos-semanales",
+  "/admin/inventario",
+  "/admin/reportes",
+];
 
 const GRUPOS_NAV: Grupo[] = [
   {
@@ -42,21 +58,31 @@ const GRUPOS_NAV: Grupo[] = [
   },
 ];
 
+function gruposParaRol(rol: RolAdmin): Grupo[] {
+  if (rol === "ADMIN") return GRUPOS_NAV;
+  return GRUPOS_NAV.map((grupo) => ({
+    ...grupo,
+    enlaces: grupo.enlaces.filter((enlace) => RUTAS_EMPLEADO.includes(enlace.href)),
+  })).filter((grupo) => grupo.enlaces.length > 0);
+}
+
 function estaActivo(pathname: string, href: string) {
   if (href === "/admin") return pathname === "/admin";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function ListaEnlaces({
+  grupos,
   pathname,
   onClicEnlace,
 }: {
+  grupos: Grupo[];
   pathname: string;
   onClicEnlace?: () => void;
 }) {
   return (
     <nav className="flex flex-col gap-5">
-      {GRUPOS_NAV.map((grupo) => (
+      {grupos.map((grupo) => (
         <div key={grupo.titulo}>
           <p className="px-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">
             {grupo.titulo}
@@ -95,13 +121,16 @@ function ListaEnlaces({
  */
 export function AdminNav({
   userEmail,
+  rol,
   signOutAction,
 }: {
   userEmail: string;
+  rol: RolAdmin;
   signOutAction: () => void;
 }) {
   const pathname = usePathname();
   const [abierto, setAbierto] = useState(false);
+  const grupos = gruposParaRol(rol);
 
   return (
     <>
@@ -149,7 +178,7 @@ export function AdminNav({
               </button>
             </div>
             <div className="mt-4">
-              <ListaEnlaces pathname={pathname} onClicEnlace={() => setAbierto(false)} />
+              <ListaEnlaces grupos={grupos} pathname={pathname} onClicEnlace={() => setAbierto(false)} />
             </div>
             <div className="mt-6 border-t border-neutral-200 pt-4">
               <p className="truncate px-3 text-xs text-neutral-500">{userEmail}</p>
@@ -183,7 +212,7 @@ export function AdminNav({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          <ListaEnlaces pathname={pathname} />
+          <ListaEnlaces grupos={grupos} pathname={pathname} />
         </div>
         <div className="border-t border-neutral-200 p-3">
           <p className="truncate px-1 text-xs text-neutral-500">{userEmail}</p>
