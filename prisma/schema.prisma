@@ -656,6 +656,16 @@ model Compra {
   // Lado inverso del gasto automatico -- ver Gasto.compraId arriba.
   gasto       Gasto?
 
+  // Compra "a credito": el proveedor no cobra al momento (ej. se paga el
+  // pedido anterior cuando llega el siguiente). Default true (pagada de
+  // una vez) para no afectar compras existentes ni el caso normal -- el
+  // Gasto automatico de Finanzas solo se genera cuando pagada pasa a true
+  // (al registrar la compra si es de contado, o al marcarla pagada despues
+  // si fue a credito). Ver inventario/actions.ts::registrarMovimiento y
+  // marcarCompraPagada.
+  pagada    Boolean   @default(true)
+  fechaPago DateTime?
+
   @@map("compras")
 }
 

@@ -39,6 +39,7 @@ export function NuevoMovimientoForm({
   const [materialId, setMaterialId] = useState(materialIdInicial ?? "");
   const [tipo, setTipo] = useState<"ENTRADA" | "SALIDA">("ENTRADA");
   const [esCompra, setEsCompra] = useState(false);
+  const [esCredito, setEsCredito] = useState(false);
   const [proveedorId, setProveedorId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
@@ -88,6 +89,7 @@ export function NuevoMovimientoForm({
     // es material que se llevó del almacén, no algo que se compró.
     if (nuevoTipo === "SALIDA") {
       setEsCompra(false);
+      setEsCredito(false);
       setCosto("");
     }
   }
@@ -225,6 +227,22 @@ export function NuevoMovimientoForm({
                   L. {montoCalculado.toFixed(2)}
                 </p>
               </div>
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  name="esCredito"
+                  checked={esCredito}
+                  onChange={(e) => setEsCredito(e.target.checked)}
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
+                Es a crédito (se paga después)
+              </label>
+              {esCredito && (
+                <p className="text-xs text-neutral-500">
+                  No se registrará el gasto todavía. Cuando la pagues, márcala como
+                  pagada desde la lista de compras pendientes en esta misma página.
+                </p>
+              )}
             </div>
           )}
         </div>

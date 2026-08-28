@@ -7,6 +7,7 @@ import { Tabs } from "@/components/admin/ui/Tabs";
 import { useToast } from "@/components/admin/ui/Toast";
 import { NuevoMaterialForm } from "./NuevoMaterialForm";
 import { NuevoMovimientoForm } from "./NuevoMovimientoForm";
+import { MarcarCompraPagadaForm } from "./MarcarCompraPagadaForm";
 
 export type MaterialResumen = {
   id: string;
@@ -18,6 +19,14 @@ export type MaterialResumen = {
   costo: string | null;
   activo: boolean;
   proveedorNombre: string | null;
+};
+
+export type CompraPendienteResumen = {
+  id: string;
+  proveedorNombre: string;
+  materialNombre: string | null;
+  montoTotal: string;
+  fecha: string;
 };
 
 /**
@@ -35,11 +44,13 @@ export function InventarioPanel({
   materiales,
   proveedores,
   materialesBajos,
+  comprasPendientes,
   tabMovimientos,
 }: {
   materiales: MaterialResumen[];
   proveedores: { id: string; nombre: string }[];
   materialesBajos: { id: string; nombre: string }[];
+  comprasPendientes: CompraPendienteResumen[];
   tabMovimientos: ReactNode;
 }) {
   const { mostrarToast } = useToast();
@@ -215,6 +226,23 @@ export function InventarioPanel({
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <span className="font-medium">Stock bajo:</span>{" "}
           {materialesBajos.map((m) => m.nombre).join(", ")}
+        </div>
+      )}
+
+      {comprasPendientes.length > 0 && (
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          <p className="font-medium">Compras pendientes de pago (a crédito):</p>
+          <ul className="mt-2 space-y-2">
+            {comprasPendientes.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {c.materialNombre ? `${c.materialNombre} — ` : ""}
+                  {c.proveedorNombre} — L. {c.montoTotal} ({c.fecha})
+                </span>
+                <MarcarCompraPagadaForm compraId={c.id} />
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

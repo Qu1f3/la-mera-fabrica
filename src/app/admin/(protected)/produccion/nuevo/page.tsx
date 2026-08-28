@@ -13,7 +13,16 @@ export default async function NuevoRegistroProduccionPage() {
       orderBy: { nombre: "asc" },
     }),
     prisma.producto.findMany({
-      select: { id: true, nombre: true, sku: true },
+      select: {
+        id: true,
+        nombre: true,
+        sku: true,
+        imagenes: {
+          select: { url: true },
+          orderBy: { orden: "asc" },
+          take: 1,
+        },
+      },
       orderBy: { nombre: "asc" },
     }),
     prisma.configuracion.findUnique({ where: { id: "global" } }),
@@ -36,7 +45,12 @@ export default async function NuevoRegistroProduccionPage() {
       </h1>
       <NuevoRegistroProduccionForm
         empleados={empleados}
-        productos={productos}
+        productos={productos.map((p) => ({
+          id: p.id,
+          nombre: p.nombre,
+          sku: p.sku,
+          imagenUrl: p.imagenes[0]?.url,
+        }))}
         montoMezclaDefault={montoMezclaDefault}
       />
     </div>

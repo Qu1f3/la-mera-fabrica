@@ -13,7 +13,12 @@ export function NuevoRegistroProduccionForm({
   montoMezclaDefault,
 }: {
   empleados: { id: string; nombre: string }[];
-  productos: { id: string; nombre: string; sku: string | null }[];
+  productos: {
+    id: string;
+    nombre: string;
+    sku: string | null;
+    imagenUrl?: string;
+  }[];
   montoMezclaDefault: string;
 }) {
   const [state, formAction, pending] = useActionState(registrarProduccion, {});
@@ -31,6 +36,7 @@ export function NuevoRegistroProduccionForm({
       productos.map((p) => ({
         id: p.id,
         etiqueta: p.sku ? `${p.nombre} (${p.sku})` : p.nombre,
+        imagenUrl: p.imagenUrl,
       })),
     [productos]
   );

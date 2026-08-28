@@ -5,6 +5,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
+function fechaDesdeInput(valor: FormDataEntryValue | null): Date | null {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return null;
+  const fecha = new Date(`${texto}T00:00:00`);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
 export type MaterialFormState = { error?: string; ok?: boolean };
 
 /**
@@ -155,6 +162,7 @@ export async function registrarMovimiento(
   const notas = String(formData.get("notas") || "").trim() || null;
   const esCompra = formData.get("esCompra") === "on";
   const proveedorId = String(formData.get("proveedorId") || "").trim();
+  const esCredito = formData.get("esCredito") === "on";
 
   if (!materialId) return { error: "Selecciona un material." };
   if (tipo !== "ENTRADA" && tipo !== "SALIDA") {
@@ -204,22 +212,28 @@ export async function registrarMovimiento(
     let compraId: string | null = null;
     if (esCompra) {
       const compra = await tx.compra.create({
-        data: { proveedorId, montoTotal, notas },
+        data: { proveedorId, montoTotal, notas, pagada: !esCredito },
       });
       compraId = compra.id;
 
       // Gasto automático: una compra de material ES un gasto, no hace
-      // falta volver a escribirlo en Finanzas.
-      const proveedor = await tx.proveedor.findUnique({ where: { id: proveedorId } });
-      await tx.gasto.create({
-        data: {
-          categoria: "MATERIALES",
-          monto: montoTotal,
-          fecha: compra.fecha,
-          compraId: compra.id,
-          descripcion: `Compra de ${material.nombre}${proveedor ? ` a ${proveedor.nombre}` : ""}`,
-        },
-      });
+      // falta volver a escribirlo en Finanzas -- PERO solo si se paga de
+      // una vez. Si es a crédito, el Gasto se crea después, cuando se
+      // marque la compra como pagada (ver marcarCompraPagada más abajo) --
+      // así Finanzas refleja cuándo sale la plata de verdad, no cuándo
+      // llegó el material.
+      if (!esCredito) {
+        const proveedor = await tx.proveedor.findUnique({ where: { id: proveedorId } });
+        await tx.gasto.create({
+          data: {
+            categoria: "MATERIALES",
+            monto: montoTotal,
+            fecha: compra.fecha,
+            compraId: compra.id,
+            descripcion: `Compra de ${material.nombre}${proveedor ? ` a ${proveedor.nombre}` : ""}`,
+          },
+        });
+      }
     }
 
     await tx.movimientoInventario.create({
@@ -298,6 +312,57 @@ export async function eliminarMovimiento(id: string, _formData: FormData) {
   revalidatePath(`/admin/inventario/${movimiento.materialId}`);
   revalidatePath("/admin/finanzas");
   revalidatePath("/admin/reportes");
+}
+
+export type MarcarCompraPagadaFormState = { error?: string };
+
+/**
+ * Marca como pagada una compra que se había registrado "a crédito" y recién
+ * ahora crea su Gasto automático (fechado el día que se marca pagada, no el
+ * día que llegó el material -- Finanzas siempre refleja cuándo sale la
+ * plata de verdad). Si la compra ya estaba pagada, no hace nada raro: el
+ * `where: { pagada: false }` de abajo hace que un doble clic no duplique el
+ * Gasto.
+ */
+export async function marcarCompraPagada(
+  compraId: string,
+  _prevState: MarcarCompraPagadaFormState,
+  formData: FormData
+): Promise<MarcarCompraPagadaFormState> {
+  await requireAdmin();
+
+  const fechaPago = fechaDesdeInput(formData.get("fechaPago")) ?? new Date();
+
+  const compra = await prisma.compra.findUnique({
+    where: { id: compraId },
+    include: { proveedor: true, movimientos: { include: { material: true }, take: 1 } },
+  });
+  if (!compra) return { error: "Esa compra ya no existe." };
+  if (compra.pagada) return {};
+
+  const material = compra.movimientos[0]?.material;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.compra.update({
+      where: { id: compraId, pagada: false },
+      data: { pagada: true, fechaPago },
+    });
+
+    await tx.gasto.create({
+      data: {
+        categoria: "MATERIALES",
+        monto: compra.montoTotal,
+        fecha: fechaPago,
+        compraId: compra.id,
+        descripcion: `Compra${material ? ` de ${material.nombre}` : ""} a ${compra.proveedor.nombre} (pagada a crédito)`,
+      },
+    });
+  });
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
+  return {};
 }
 
 export type ProveedorFormState = { error?: string };

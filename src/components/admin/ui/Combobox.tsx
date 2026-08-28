@@ -6,6 +6,10 @@ export type OpcionCombobox = {
   id: string;
   etiqueta: string;
   subtexto?: string;
+  // Miniatura opcional (ej: foto del producto) mostrada junto al texto en
+  // la lista de resultados -- si no se pasa, la fila se ve igual que
+  // siempre (ningún uso existente del Combobox se ve afectado).
+  imagenUrl?: string;
 };
 
 /**
@@ -125,14 +129,29 @@ export function Combobox({
                 type="button"
                 onMouseDown={(evento) => evento.preventDefault()}
                 onClick={() => elegir(opcion)}
-                className={`flex w-full flex-col items-start px-3 py-2 text-left ${
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left ${
                   indice === indiceActivo ? "bg-neutral-100" : "hover:bg-neutral-50"
                 }`}
               >
-                <span className="text-neutral-900">{opcion.etiqueta}</span>
-                {opcion.subtexto && (
-                  <span className="text-xs text-neutral-500">{opcion.subtexto}</span>
-                )}
+                {opcion.imagenUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- miniatura
+                  // chica en una lista desplegable; next/image no aporta nada acá
+                  // (imagen ya optimizada en origen) y complica el loader.
+                  <img
+                    src={opcion.imagenUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-8 w-8 flex-shrink-0 rounded object-cover"
+                  />
+                ) : null}
+                <span className="flex min-w-0 flex-col items-start">
+                  <span className="truncate text-neutral-900">{opcion.etiqueta}</span>
+                  {opcion.subtexto && (
+                    <span className="truncate text-xs text-neutral-500">
+                      {opcion.subtexto}
+                    </span>
+                  )}
+                </span>
               </button>
             </li>
           ))}

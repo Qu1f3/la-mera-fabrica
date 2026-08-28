@@ -3,11 +3,12 @@ import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { formatearFechaHonduras } from "@/lib/fecha";
 import { eliminarMovimiento } from "./actions";
 import { InventarioPanel } from "./InventarioPanel";
+import { MarcarCompraPagadaForm } from "./MarcarCompraPagadaForm";
 
 export const metadata = { title: "Inventario — Panel administrativo" };
 
 export default async function InventarioPage() {
-  const [materiales, movimientos, proveedores] = await Promise.all([
+  const [materiales, movimientos, proveedores, comprasPendientes] = await Promise.all([
     prisma.materialInventario.findMany({
       include: { proveedor: true },
       orderBy: [{ activo: "desc" }, { nombre: "asc" }],
@@ -21,6 +22,13 @@ export default async function InventarioPage() {
       where: { activo: true },
       select: { id: true, nombre: true },
       orderBy: { nombre: "asc" },
+    }),
+    // Compras a crédito que todavía no se han pagado -- ver
+    // inventario/actions.ts::marcarCompraPagada.
+    prisma.compra.findMany({
+      where: { pagada: false },
+      include: { proveedor: true, movimientos: { include: { material: true }, take: 1 } },
+      orderBy: { fecha: "asc" },
     }),
   ]);
 
@@ -45,6 +53,14 @@ export default async function InventarioPage() {
     costo: m.costo ? m.costo.toString() : null,
     activo: m.activo,
     proveedorNombre: m.proveedor?.nombre ?? null,
+  }));
+
+  const comprasPendientesResumen = comprasPendientes.map((c) => ({
+    id: c.id,
+    proveedorNombre: c.proveedor.nombre,
+    materialNombre: c.movimientos[0]?.material.nombre ?? null,
+    montoTotal: c.montoTotal.toString(),
+    fecha: formatearFechaHonduras(c.fecha),
   }));
 
   const tabMovimientos = (
@@ -92,9 +108,24 @@ export default async function InventarioPage() {
                 {movimiento.costo ? `L. ${movimiento.costo.toString()}` : "—"}
               </td>
               <td className="px-4 py-3 text-neutral-500">
-                {movimiento.compra
-                  ? `${movimiento.compra.proveedor.nombre} — L. ${movimiento.compra.montoTotal.toString()}`
-                  : "—"}
+                {movimiento.compra ? (
+                  <div>
+                    <p>
+                      {movimiento.compra.proveedor.nombre} — L.{" "}
+                      {movimiento.compra.montoTotal.toString()}
+                    </p>
+                    {!movimiento.compra.pagada && (
+                      <div className="mt-1 flex flex-col items-start gap-1">
+                        <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          Pendiente de pago
+                        </span>
+                        <MarcarCompraPagadaForm compraId={movimiento.compra.id} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  "—"
+                )}
               </td>
               <td className="px-4 py-3 text-right">
                 <form action={eliminarMovimiento.bind(null, movimiento.id)}>
@@ -125,6 +156,7 @@ export default async function InventarioPage() {
       materiales={materialesResumen}
       proveedores={proveedores}
       materialesBajos={materialesBajos.map((m) => ({ id: m.id, nombre: m.nombre }))}
+      comprasPendientes={comprasPendientesResumen}
       tabMovimientos={tabMovimientos}
     />
   );
