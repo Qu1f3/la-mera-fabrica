@@ -43,6 +43,7 @@ export default async function ExtrasPage() {
       id: t.id,
       descripcion: t.descripcion,
       montoSugerido: t.montoSugerido ? t.montoSugerido.toString() : null,
+      signo: t.signo,
     }));
 
   return (
@@ -90,6 +91,15 @@ export default async function ExtrasPage() {
                         (sugerido L. {tipo.montoSugerido.toString()})
                       </span>
                     )}
+                    <span
+                      className={`ml-2 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                        tipo.signo === "RESTA"
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {tipo.signo === "RESTA" ? "Resta" : "Suma"}
+                    </span>
                   </span>
                   <TipoPagoExtraToggle id={tipo.id} activo={tipo.activo} />
                 </li>
@@ -126,8 +136,12 @@ export default async function ExtrasPage() {
                   {pago.empleado.nombre}
                 </td>
                 <td className="px-4 py-3 text-neutral-700">{pago.descripcion}</td>
-                <td className="px-4 py-3 text-neutral-700">
-                  L. {pago.monto.toString()}
+                <td
+                  className={`px-4 py-3 font-medium ${
+                    Number(pago.monto) < 0 ? "text-red-600" : "text-neutral-700"
+                  }`}
+                >
+                  {Number(pago.monto) < 0 ? "-" : "+"} L. {Math.abs(Number(pago.monto)).toFixed(2)}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <form action={eliminarPagoExtra.bind(null, pago.id)}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { crearTipoPagoExtra } from "./actions";
 
 const inputClass =
@@ -8,6 +8,7 @@ const inputClass =
 
 export function NuevoTipoPagoExtraForm() {
   const [state, formAction, pending] = useActionState(crearTipoPagoExtra, {});
+  const [signo, setSigno] = useState<"SUMA" | "RESTA">("SUMA");
 
   return (
     <form action={formAction} className="mt-3 flex flex-wrap items-end gap-2">
@@ -25,6 +26,34 @@ export function NuevoTipoPagoExtraForm() {
           className={`${inputClass} mt-1 w-32`}
         />
       </label>
+      <div className="text-xs text-neutral-500">
+        ¿Suma o resta del pago semanal?
+        <div className="mt-1 flex gap-1">
+          <button
+            type="button"
+            onClick={() => setSigno("SUMA")}
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              signo === "SUMA"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-neutral-300 text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            Suma
+          </button>
+          <button
+            type="button"
+            onClick={() => setSigno("RESTA")}
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              signo === "RESTA"
+                ? "border-red-300 bg-red-50 text-red-700"
+                : "border-neutral-300 text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            Resta
+          </button>
+        </div>
+      </div>
+      <input type="hidden" name="signo" value={signo} />
       <button
         type="submit"
         disabled={pending}

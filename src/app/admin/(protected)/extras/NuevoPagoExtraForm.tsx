@@ -12,7 +12,12 @@ const inputClass =
 // el botón "Otro" también se puede marcar como seleccionado visualmente.
 const OTRO = "__OTRO__";
 
-type TipoOpcion = { id: string; descripcion: string; montoSugerido: string | null };
+type TipoOpcion = {
+  id: string;
+  descripcion: string;
+  montoSugerido: string | null;
+  signo: "SUMA" | "RESTA";
+};
 
 /**
  * Formulario simplificado para registrar un pago extra -- pensado para que
@@ -58,6 +63,8 @@ export function NuevoPagoExtraForm({
   const esOtro = seleccion === OTRO;
   const tipoPagoExtraId = !esOtro ? seleccion : "";
   const faltaDescripcion = esOtro && descripcion.trim() === "";
+  const tipoSeleccionado = tipos.find((t) => t.id === seleccion);
+  const esResta = tipoSeleccionado?.signo === "RESTA";
 
   return (
     <form action={formAction} className="mt-3 space-y-4">
@@ -82,11 +89,16 @@ export function NuevoPagoExtraForm({
               onClick={() => elegirTipo(tipo)}
               className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
                 seleccion === tipo.id
-                  ? "border-neutral-900 bg-neutral-900 text-white"
-                  : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                  ? tipo.signo === "RESTA"
+                    ? "border-red-600 bg-red-600 text-white"
+                    : "border-neutral-900 bg-neutral-900 text-white"
+                  : tipo.signo === "RESTA"
+                    ? "border-red-300 text-red-700 hover:bg-red-50"
+                    : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
               }`}
             >
               {tipo.descripcion}
+              {tipo.signo === "RESTA" && " (resta)"}
             </button>
           ))}
           <button
@@ -119,7 +131,7 @@ export function NuevoPagoExtraForm({
 
       {seleccion !== "" && (
         <label className="block text-xs text-neutral-500 sm:w-48">
-          ¿Cuánto se le paga? (L.)
+          {esResta ? "¿Cuánto se le resta?" : "¿Cuánto se le paga?"} (L.)
           <input
             type="number"
             name="monto"
@@ -128,8 +140,13 @@ export function NuevoPagoExtraForm({
             required
             value={monto}
             onChange={(evento) => setMonto(evento.target.value)}
-            className={`${inputClass} mt-1`}
+            className={`${inputClass} mt-1 ${esResta ? "border-red-300" : ""}`}
           />
+          {esResta && (
+            <span className="mt-1 block text-red-600">
+              Esto se restará del pago semanal del empleado.
+            </span>
+          )}
         </label>
       )}
 

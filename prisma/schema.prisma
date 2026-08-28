@@ -518,12 +518,28 @@ model RegistroMezcla {
   @@map("registros_mezcla")
 }
 
+// Si un tipo de extra SUMA o RESTA del pago semanal del empleado -- ej.
+// "Cargar Ladrillo" suma, "Prestamo"/"Adelanto" resta. Enum nuevo (no se le
+// agrega un valor a uno existente), seguro de usar como default en la misma
+// migracion -- ver "MIGRACIONES DE POSTGRES CON ENUMS" en la memoria del
+// proyecto para por que eso importa.
+enum SignoPagoExtra {
+  SUMA
+  RESTA
+}
+
 // Catalogo configurable de tipos de extra (ej: "Cargar pedido al camion").
 model TipoPagoExtra {
   id            String              @id @default(cuid())
   descripcion   String
   montoSugerido Decimal?            @db.Decimal(10, 2)
   activo        Boolean             @default(true)
+  // Default SUMA para no afectar los tipos ya creados (todos eran "suma" de
+  // hecho). PagoExtraEmpleado.monto se guarda ya con el signo aplicado (ver
+  // registrarPagoExtra en actions.ts) -- mismo patron de snapshot historico
+  // que descripcion/monto: si el tipo cambia de signo despues, los pagos ya
+  // registrados no cambian.
+  signo         SignoPagoExtra      @default(SUMA)
   extras        PagoExtraEmpleado[]
 
   @@map("tipos_pago_extra")

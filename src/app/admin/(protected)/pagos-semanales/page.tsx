@@ -72,7 +72,11 @@ export default async function PagosSemanalesPage() {
                 <td className="px-4 py-3 text-neutral-600">
                   L. {pago.totalMezcla.toString()}
                 </td>
-                <td className="px-4 py-3 text-neutral-600">
+                <td
+                  className={`px-4 py-3 ${
+                    Number(pago.totalExtras) < 0 ? "font-medium text-red-600" : "text-neutral-600"
+                  }`}
+                >
                   L. {pago.totalExtras.toString()}
                 </td>
                 <td className="px-4 py-3 font-semibold text-neutral-900">
