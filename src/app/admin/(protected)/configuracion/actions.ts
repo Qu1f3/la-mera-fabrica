@@ -38,3 +38,22 @@ export async function actualizarConfiguracion(formData: FormData) {
   revalidatePath("/", "layout");
   revalidatePath("/admin/configuracion");
 }
+
+/**
+ * Fase 9: guarda el texto de una plantilla de WhatsApp (Configuracion no
+ * necesita crearlas -- ver configuracion/page.tsx, que las crea con el
+ * texto por defecto de src/lib/whatsapp.ts la primera vez que hacen falta).
+ * Solo se edita el cuerpo del mensaje, nunca la clave que la identifica.
+ */
+export async function actualizarPlantilla(clave: string, formData: FormData) {
+  await requireAdmin();
+  const cuerpo = String(formData.get("cuerpo") || "").trim();
+  if (!cuerpo) return;
+
+  await prisma.plantillaMensaje.update({ where: { clave }, data: { cuerpo } });
+
+  revalidatePath("/admin/configuracion");
+  // "layout" porque el mensaje se usa en /admin/pedidos/[id], una ruta
+  // dinámica -- revalidar solo "/admin/pedidos" no alcanzaría los detalles.
+  revalidatePath("/admin/pedidos", "layout");
+}

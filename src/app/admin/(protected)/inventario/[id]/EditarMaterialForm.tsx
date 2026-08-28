@@ -81,17 +81,15 @@ export function EditarMaterialForm({
           className={`${inputClass} mt-1`}
         />
       </label>
-      <label className="text-xs text-neutral-500">
-        Costo por unidad
-        <input
-          type="number"
-          name="costo"
-          min="0"
-          step="0.01"
-          defaultValue={costo}
-          className={`${inputClass} mt-1`}
-        />
-      </label>
+      <div className="text-xs text-neutral-500">
+        Costo por unidad (solo lectura)
+        <p className={`${inputClass} mt-1 bg-neutral-100 text-neutral-700`}>
+          {costo ? `L. ${costo}` : "— (todavía sin entradas con costo)"}
+        </p>
+        <span className="mt-1 block text-neutral-400">
+          Se actualiza solo con el costo de la última entrada registrada.
+        </span>
+      </div>
       <label className="text-xs text-neutral-500 sm:col-span-2">
         Proveedor
         <Combobox

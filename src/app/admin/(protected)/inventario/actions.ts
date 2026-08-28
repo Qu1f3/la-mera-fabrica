@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
-export type MaterialFormState = { error?: string };
+export type MaterialFormState = { error?: string; ok?: boolean };
 
 /**
  * La cantidad actual de un material NUNCA se edita a mano -- solo cambia
@@ -23,8 +23,6 @@ export async function crearMaterial(
   const unidadMedida = String(formData.get("unidadMedida") || "").trim();
   const cantidadPorUnidad = Number(formData.get("cantidadPorUnidad") || 1);
   const cantidadMinima = Number(formData.get("cantidadMinima") || 0);
-  const costoRaw = formData.get("costo");
-  const costo = costoRaw && String(costoRaw).trim() ? Number(costoRaw) : null;
   const proveedorId = String(formData.get("proveedorId") || "").trim() || null;
   const notas = String(formData.get("notas") || "").trim() || null;
 
@@ -36,24 +34,27 @@ export async function crearMaterial(
   if (!Number.isFinite(cantidadMinima) || cantidadMinima < 0) {
     return { error: "La cantidad mínima no es válida." };
   }
-  if (costo !== null && (!Number.isFinite(costo) || costo < 0)) {
-    return { error: "El costo no es válido." };
-  }
 
-  const material = await prisma.materialInventario.create({
+  // El costo NO se pide acá -- se preguntaría dos veces (una al crear el
+  // material y otra al registrar la primera entrada). Empieza en null y se
+  // sincroniza solo desde registrarMovimiento con el costo de la última
+  // entrada, igual que cantidadActual solo cambia por movimiento.
+  await prisma.materialInventario.create({
     data: {
       nombre,
       unidadMedida,
       cantidadPorUnidad,
       cantidadMinima,
-      costo,
       proveedorId,
       notas,
     },
   });
 
+  // No redirige: el modal de "Nuevo material" se queda en /admin/inventario,
+  // revalida la data y el formulario le avisa al usuario (ok:true) para
+  // cerrarse solo y mostrar un toast, sin recargar la pagina.
   revalidatePath("/admin/inventario");
-  redirect(`/admin/inventario/${material.id}`);
+  return { ok: true };
 }
 
 export async function actualizarMaterial(
@@ -67,8 +68,6 @@ export async function actualizarMaterial(
   const unidadMedida = String(formData.get("unidadMedida") || "").trim();
   const cantidadPorUnidad = Number(formData.get("cantidadPorUnidad") || 1);
   const cantidadMinima = Number(formData.get("cantidadMinima") || 0);
-  const costoRaw = formData.get("costo");
-  const costo = costoRaw && String(costoRaw).trim() ? Number(costoRaw) : null;
   const proveedorId = String(formData.get("proveedorId") || "").trim() || null;
   const notas = String(formData.get("notas") || "").trim() || null;
 
@@ -80,10 +79,9 @@ export async function actualizarMaterial(
   if (!Number.isFinite(cantidadMinima) || cantidadMinima < 0) {
     return { error: "La cantidad mínima no es válida." };
   }
-  if (costo !== null && (!Number.isFinite(costo) || costo < 0)) {
-    return { error: "El costo no es válido." };
-  }
 
+  // El costo no se edita acá -- ver nota en crearMaterial. Se muestra en la
+  // ficha como dato de solo lectura, sincronizado desde registrarMovimiento.
   await prisma.materialInventario.update({
     where: { id },
     data: {
@@ -91,7 +89,6 @@ export async function actualizarMaterial(
       unidadMedida,
       cantidadPorUnidad,
       cantidadMinima,
-      costo,
       proveedorId,
       notas,
     },
@@ -130,7 +127,7 @@ export async function eliminarMaterial(id: string, _formData: FormData) {
   redirect("/admin/inventario");
 }
 
-export type MovimientoFormState = { error?: string };
+export type MovimientoFormState = { error?: string; ok?: boolean };
 
 /**
  * Registra una entrada o salida de inventario para un material y ajusta su
@@ -210,6 +207,19 @@ export async function registrarMovimiento(
         data: { proveedorId, montoTotal, notas },
       });
       compraId = compra.id;
+
+      // Gasto automático: una compra de material ES un gasto, no hace
+      // falta volver a escribirlo en Finanzas.
+      const proveedor = await tx.proveedor.findUnique({ where: { id: proveedorId } });
+      await tx.gasto.create({
+        data: {
+          categoria: "MATERIALES",
+          monto: montoTotal,
+          fecha: compra.fecha,
+          compraId: compra.id,
+          descripcion: `Compra de ${material.nombre}${proveedor ? ` a ${proveedor.nombre}` : ""}`,
+        },
+      });
     }
 
     await tx.movimientoInventario.create({
@@ -218,13 +228,23 @@ export async function registrarMovimiento(
 
     await tx.materialInventario.update({
       where: { id: materialId },
-      data: { cantidadActual: { increment: deltaStock } },
+      data: {
+        cantidadActual: { increment: deltaStock },
+        // El "costo" del material siempre refleja la última entrada con
+        // costo -- así solo se captura un precio en un solo lugar (acá),
+        // nunca por separado al crear/editar el material.
+        ...(tipo === "ENTRADA" && costo !== null ? { costo } : {}),
+      },
     });
   });
 
+  // Mismo criterio que crearMaterial: sin redirect, para que el modal de
+  // "Registrar movimiento" se cierre solo (via el ok:true) en vez de navegar.
   revalidatePath("/admin/inventario");
   revalidatePath(`/admin/inventario/${materialId}`);
-  redirect("/admin/inventario");
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
+  return { ok: true };
 }
 
 export async function eliminarMovimiento(id: string, _formData: FormData) {
@@ -267,6 +287,8 @@ export async function eliminarMovimiento(id: string, _formData: FormData) {
         where: { compraId: movimiento.compraId },
       });
       if (restantes === 0) {
+        // El gasto automático de esta compra tampoco se sostiene sin ella.
+        await tx.gasto.deleteMany({ where: { compraId: movimiento.compraId } });
         await tx.compra.delete({ where: { id: movimiento.compraId } });
       }
     }
@@ -274,6 +296,8 @@ export async function eliminarMovimiento(id: string, _formData: FormData) {
 
   revalidatePath("/admin/inventario");
   revalidatePath(`/admin/inventario/${movimiento.materialId}`);
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
 }
 
 export type ProveedorFormState = { error?: string };

@@ -264,3 +264,39 @@ export type ItemPedidoFormulario = {
   cantidad: number;
   precioUnitario: number;
 };
+
+// ---------------------------------------------------------------------------
+// Sistema de gestión: finanzas (Fase 8)
+// ---------------------------------------------------------------------------
+
+export type TipoIngreso = "VENTA" | "ANTICIPO" | "PAGO_FINAL" | "OTRO";
+
+export type TipoGasto =
+  | "MATERIALES"
+  | "EMPLEADOS"
+  | "COMBUSTIBLE"
+  | "ELECTRICIDAD"
+  | "AGUA"
+  | "MANTENIMIENTO"
+  | "TRANSPORTE"
+  | "REPARACIONES"
+  | "OTROS";
+
+export const ETIQUETA_TIPO_INGRESO: Record<TipoIngreso, string> = {
+  VENTA: "Venta",
+  ANTICIPO: "Anticipo",
+  PAGO_FINAL: "Pago final",
+  OTRO: "Otro",
+};
+
+export const ETIQUETA_TIPO_GASTO: Record<TipoGasto, string> = {
+  MATERIALES: "Materiales",
+  EMPLEADOS: "Empleados",
+  COMBUSTIBLE: "Combustible",
+  ELECTRICIDAD: "Electricidad",
+  AGUA: "Agua",
+  MANTENIMIENTO: "Mantenimiento",
+  TRANSPORTE: "Transporte",
+  REPARACIONES: "Reparaciones",
+  OTROS: "Otros",
+};

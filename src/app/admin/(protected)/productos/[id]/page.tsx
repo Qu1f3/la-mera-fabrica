@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
@@ -20,6 +21,19 @@ import {
 
 const inputClass =
   "rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const producto = await prisma.producto.findUnique({
+    where: { id },
+    select: { nombre: true },
+  });
+  return { title: producto ? `${producto.nombre} — Panel administrativo` : "Producto — Panel administrativo" };
+}
 
 export default async function EditarProductoPage({
   params,

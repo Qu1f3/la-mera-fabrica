@@ -97,35 +97,56 @@ export async function crearPedido(
     calcularTotalesPedido(items, entradaAnticipo);
   const codigo = await generarCodigoPedido();
 
-  const pedido = await prisma.pedido.create({
-    data: {
-      codigo,
-      clienteId,
-      fechaPrometida,
-      porcentajeAnticipo,
-      montoAnticipo,
-      montoTotal,
-      saldoPendiente,
-      notas,
-      items: {
-        create: items.map((item) => ({
-          productoId: item.productoId,
-          categoria: item.categoria || null,
-          diseno: item.diseno || null,
-          color: item.color || null,
-          cantidad: item.cantidad,
-          precioUnitario: item.precioUnitario,
-          subtotal: calcularSubtotal(item.cantidad, item.precioUnitario),
-        })),
+  const pedido = await prisma.$transaction(async (tx) => {
+    const nuevo = await tx.pedido.create({
+      data: {
+        codigo,
+        clienteId,
+        fechaPrometida,
+        porcentajeAnticipo,
+        montoAnticipo,
+        montoTotal,
+        saldoPendiente,
+        notas,
+        items: {
+          create: items.map((item) => ({
+            productoId: item.productoId,
+            categoria: item.categoria || null,
+            diseno: item.diseno || null,
+            color: item.color || null,
+            cantidad: item.cantidad,
+            precioUnitario: item.precioUnitario,
+            subtotal: calcularSubtotal(item.cantidad, item.precioUnitario),
+          })),
+        },
+        historial: {
+          create: { estado: "PEDIDO_RECIBIDO", adminUsuarioId: adminUsuario.id },
+        },
       },
-      historial: {
-        create: { estado: "PEDIDO_RECIBIDO", adminUsuarioId: adminUsuario.id },
-      },
-    },
+    });
+
+    // Ingreso automático: el anticipo de un pedido nuevo ES un ingreso, no
+    // hace falta que alguien lo vuelva a escribir en Finanzas. Ver
+    // cambiarEstadoPedido para el ingreso del pago final al entregar.
+    if (montoAnticipo > 0) {
+      await tx.ingreso.create({
+        data: {
+          categoria: "ANTICIPO",
+          monto: montoAnticipo,
+          fecha: new Date(),
+          pedidoId: nuevo.id,
+          descripcion: `Anticipo de pedido ${codigo}`,
+        },
+      });
+    }
+
+    return nuevo;
   });
 
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/clientes/${clienteId}`);
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
   redirect(`/admin/pedidos/${pedido.id}`);
 }
 
@@ -136,22 +157,47 @@ export async function cambiarEstadoPedido(pedidoId: string, formData: FormData) 
   const estado = String(formData.get("estado") || "") as EstadoPedido;
   const notas = String(formData.get("notas") || "").trim() || null;
 
-  const data: Prisma.PedidoUpdateInput = { estado };
-  // Estos dos campos se completan solos al llegar al estado correspondiente
-  // -- nunca se piden a mano (ver instrucción: "no introducir manualmente
-  // los días transcurridos").
-  if (estado === "EN_SECADO") data.fechaInicioSecado = new Date();
-  if (estado === "ENTREGADO") data.fechaEntregaReal = new Date();
+  await prisma.$transaction(async (tx) => {
+    const pedidoActual = await tx.pedido.findUniqueOrThrow({ where: { id: pedidoId } });
 
-  await prisma.$transaction([
-    prisma.pedido.update({ where: { id: pedidoId }, data }),
-    prisma.historialEstadoPedido.create({
+    const data: Prisma.PedidoUpdateInput = { estado };
+    // Estos dos campos se completan solos al llegar al estado correspondiente
+    // -- nunca se piden a mano (ver instrucción: "no introducir manualmente
+    // los días transcurridos").
+    if (estado === "EN_SECADO") data.fechaInicioSecado = new Date();
+    if (estado === "ENTREGADO") data.fechaEntregaReal = new Date();
+
+    await tx.pedido.update({ where: { id: pedidoId }, data });
+    await tx.historialEstadoPedido.create({
       data: { pedidoId, estado, adminUsuarioId: adminUsuario.id, notas },
-    }),
-  ]);
+    });
+
+    // Ingreso automático: al llegar a ENTREGADO se asume cobrado el saldo
+    // que quedaba pendiente. Se busca primero para no duplicarlo si el
+    // pedido pasa por ENTREGADO más de una vez (se corrige el estado y se
+    // vuelve a marcar).
+    if (estado === "ENTREGADO" && Number(pedidoActual.saldoPendiente) > 0) {
+      const yaExiste = await tx.ingreso.findFirst({
+        where: { pedidoId, categoria: "PAGO_FINAL" },
+      });
+      if (!yaExiste) {
+        await tx.ingreso.create({
+          data: {
+            categoria: "PAGO_FINAL",
+            monto: pedidoActual.saldoPendiente,
+            fecha: new Date(),
+            pedidoId,
+            descripcion: `Pago final de pedido ${pedidoActual.codigo}`,
+          },
+        });
+      }
+    }
+  });
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/pedidos");
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
 }
 
 export async function asignarFechaPrometida(pedidoId: string, formData: FormData) {

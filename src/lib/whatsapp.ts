@@ -81,26 +81,52 @@ export function mensajeSolicitudCotizacion(datos: {
 }
 
 // ---------------------------------------------------------------------------
-// Sistema de gestión: mensajes de pedido
+// Sistema de gestión: mensajes de pedido -- plantillas configurables
 // ---------------------------------------------------------------------------
-// Plantillas por defecto -- el admin las puede editar en el modal antes de
-// enviar (ver ConfirmarPedidoWhatsApp.tsx). Más adelante (plantillas
-// configurables desde el panel, modelo PlantillaMensaje) esto pasa a leerse
-// de la base de datos en vez de vivir hardcodeado acá; mientras tanto el
-// texto es exactamente el que se acordó.
+// Fase 9: estos mensajes ya NO están fijos en el código -- se guardan en la
+// tabla PlantillaMensaje y se pueden editar desde /admin/configuracion
+// (pestaña "Plantillas de WhatsApp"). Este archivo solo guarda el texto por
+// DEFECTO (para la primera vez que se necesita una plantilla y todavía no
+// existe en la base de datos -- ver configuracion/page.tsx) y la función
+// que sustituye las variables `{{clave}}` por el dato real de cada pedido.
+// El mensaje siempre se puede editar a mano justo antes de enviarlo
+// (EnviarWhatsAppModal.tsx), esto solo cambia CUÁL es el texto de partida.
 
-export function mensajeConfirmacionPedido(datos: {
-  nombreCliente: string;
-  codigo: string;
-  linkTracker: string;
-}): string {
-  return `Hola, ${datos.nombreCliente}. \u{1F9F1}\n\nHemos recibido correctamente su pedido en Ladrillera La Mera Fábrica.\n\nSu código de pedido es:\n${datos.codigo}\n\nPuedes consultar el estado de tu pedido aquí:\n${datos.linkTracker}\n\nGracias por confiar en nosotros. \u{1F3ED}`;
-}
+export const CLAVE_PLANTILLA_CONFIRMACION_PEDIDO = "confirmacion_pedido";
+export const CLAVE_PLANTILLA_PEDIDO_LISTO = "pedido_listo";
 
-export function mensajePedidoListo(datos: {
-  nombreCliente: string;
-  codigo: string;
-  fecha: string;
-}): string {
-  return `Hola, ${datos.nombreCliente}. \u{1F9F1}\n\nLe informamos que su pedido ${datos.codigo} ya está listo.\n\nPuede pasar a recogerlo a partir del ${datos.fecha}.\n\nGracias por su preferencia.\nLadrillera La Mera Fábrica.`;
+export const PLANTILLAS_WHATSAPP_DEFECTO: {
+  clave: string;
+  nombre: string;
+  cuerpo: string;
+}[] = [
+  {
+    clave: CLAVE_PLANTILLA_CONFIRMACION_PEDIDO,
+    nombre: "Confirmación de pedido",
+    cuerpo: `Hola, {{nombreCliente}}. \u{1F9F1}\n\nHemos recibido correctamente su pedido en Ladrillera La Mera Fábrica.\n\nSu código de pedido es:\n{{codigo}}\n\nPuedes consultar el estado de tu pedido aquí:\n{{linkTracker}}\n\nGracias por confiar en nosotros. \u{1F3ED}`,
+  },
+  {
+    clave: CLAVE_PLANTILLA_PEDIDO_LISTO,
+    nombre: "Pedido listo",
+    cuerpo: `Hola, {{nombreCliente}}. \u{1F9F1}\n\nLe informamos que su pedido {{codigo}} ya está listo.\n\nPuede pasar a recogerlo a partir del {{fecha}}.\n\nGracias por su preferencia.\nLadrillera La Mera Fábrica.`,
+  },
+];
+
+// Qué variables acepta cada plantilla -- se muestra como ayuda debajo del
+// campo de edición para que el admin no invente un nombre que no existe.
+export const VARIABLES_PLANTILLA: Record<string, string[]> = {
+  [CLAVE_PLANTILLA_CONFIRMACION_PEDIDO]: ["nombreCliente", "codigo", "linkTracker"],
+  [CLAVE_PLANTILLA_PEDIDO_LISTO]: ["nombreCliente", "codigo", "fecha"],
+};
+
+/**
+ * Sustituye `{{variable}}` por su valor real. Si una variable no viene en
+ * `valores` (ej: el admin escribió mal el nombre), se deja el `{{...}}`
+ * literal en el mensaje en vez de borrarlo en silencio -- así el error se
+ * nota de inmediato al leer el mensaje antes de enviarlo.
+ */
+export function renderPlantilla(cuerpo: string, valores: Record<string, string>): string {
+  return cuerpo.replace(/\{\{(\w+)\}\}/g, (coincidencia, clave: string) =>
+    Object.prototype.hasOwnProperty.call(valores, clave) ? valores[clave] : coincidencia
+  );
 }

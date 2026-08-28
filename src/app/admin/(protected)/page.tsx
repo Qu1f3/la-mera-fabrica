@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { rangoDiaHonduras } from "@/lib/fecha";
 
+export const metadata = { title: "Inicio — Panel administrativo" };
+
 export default async function AdminDashboardPage() {
   const { inicio: hoyInicio, fin: hoyFin } = rangoDiaHonduras();
 

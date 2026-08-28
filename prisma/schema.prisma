@@ -556,6 +556,8 @@ model PagoEmpleado {
   notas           String?
   creadoEn        DateTime          @default(now())
   actualizadoEn   DateTime          @updatedAt
+  // Lado inverso del gasto automatico -- ver Gasto.pagoEmpleadoId arriba.
+  gasto           Gasto?
 
   @@unique([empleadoId, semanaInicio])
   @@map("pagos_empleado")
@@ -645,6 +647,8 @@ model Compra {
   montoTotal  Decimal                @db.Decimal(10, 2)
   notas       String?
   movimientos MovimientoInventario[]
+  // Lado inverso del gasto automatico -- ver Gasto.compraId arriba.
+  gasto       Gasto?
 
   @@map("compras")
 }
@@ -693,6 +697,14 @@ model Gasto {
   fecha       DateTime  @default(now())
   descripcion String?
   notas       String?
+  // Un gasto de categoria EMPLEADOS/MATERIALES es 100% automatico -- se
+  // genera solo al marcar un pago semanal como pagado o al registrar una
+  // compra de inventario (ver pagos-semanales/actions.ts e
+  // inventario/actions.ts). Nunca se crea a mano desde Finanzas.
+  pagoEmpleadoId String?       @unique
+  pagoEmpleado   PagoEmpleado? @relation(fields: [pagoEmpleadoId], references: [id])
+  compraId       String?       @unique
+  compra         Compra?       @relation(fields: [compraId], references: [id])
 
   @@index([fecha])
   @@map("gastos")

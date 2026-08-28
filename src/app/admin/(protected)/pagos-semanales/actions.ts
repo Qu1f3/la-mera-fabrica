@@ -105,26 +105,62 @@ export async function marcarPagoSemanalPagado(
     return { error: "El monto pagado no es válido." };
   }
 
-  await prisma.pagoEmpleado.update({
-    where: { id },
-    data: { estado: "PAGADO", montoPagado, fechaPago },
+  await prisma.$transaction(async (tx) => {
+    const pago = await tx.pagoEmpleado.update({
+      where: { id },
+      data: { estado: "PAGADO", montoPagado, fechaPago },
+      include: { empleado: true },
+    });
+
+    // Gasto automático: un pago semanal marcado como pagado ES un gasto de
+    // planilla. upsert por pagoEmpleadoId -- si se vuelve a marcar pagado
+    // (ej: se corrigió el monto) se actualiza en vez de duplicarse.
+    await tx.gasto.upsert({
+      where: { pagoEmpleadoId: id },
+      create: {
+        categoria: "EMPLEADOS",
+        monto: montoPagado,
+        fecha: fechaPago,
+        pagoEmpleadoId: id,
+        descripcion: `Pago semanal de ${pago.empleado.nombre}`,
+      },
+      update: { monto: montoPagado, fecha: fechaPago },
+    });
   });
 
   revalidatePath("/admin/pagos-semanales");
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
   return {};
 }
 
 export async function marcarPagoSemanalPendiente(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.pagoEmpleado.update({
-    where: { id },
-    data: { estado: "PENDIENTE", montoPagado: null, fechaPago: null },
-  });
+  await prisma.$transaction([
+    prisma.pagoEmpleado.update({
+      where: { id },
+      data: { estado: "PENDIENTE", montoPagado: null, fechaPago: null },
+    }),
+    // Si se revierte el pago, el gasto tampoco se sostiene -- el dinero no
+    // salió de verdad. deleteMany (no delete) porque puede que nunca se
+    // haya generado (si el pago nunca pasó por PAGADO).
+    prisma.gasto.deleteMany({ where: { pagoEmpleadoId: id } }),
+  ]);
   revalidatePath("/admin/pagos-semanales");
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
 }
 
 export async function eliminarPagoSemanal(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.pagoEmpleado.delete({ where: { id } });
+  // Sin onDelete: Cascade en el schema -- se borra a mano el gasto ligado
+  // antes que el pago, mismo criterio que eliminarMovimiento con su Compra
+  // huérfana en inventario/actions.ts.
+  await prisma.$transaction([
+    prisma.gasto.deleteMany({ where: { pagoEmpleadoId: id } }),
+    prisma.pagoEmpleado.delete({ where: { id } }),
+  ]);
   revalidatePath("/admin/pagos-semanales");
+  revalidatePath("/admin/finanzas");
+  revalidatePath("/admin/reportes");
 }

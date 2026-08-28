@@ -12,7 +12,12 @@ import {
   formatearFechaHoraHonduras,
   diasTranscurridosHonduras,
 } from "@/lib/fecha";
-import { mensajeConfirmacionPedido, mensajePedidoListo } from "@/lib/whatsapp";
+import {
+  renderPlantilla,
+  PLANTILLAS_WHATSAPP_DEFECTO,
+  CLAVE_PLANTILLA_CONFIRMACION_PEDIDO,
+  CLAVE_PLANTILLA_PEDIDO_LISTO,
+} from "@/lib/whatsapp";
 import { SITE_URL } from "@/lib/site";
 import {
   COLOR_ESTADO_PEDIDO,
@@ -64,6 +69,16 @@ export default async function DetallePedidoPage({
   });
 
   if (!pedido) notFound();
+
+  // Plantillas de WhatsApp editables desde /admin/configuracion (Fase 9) --
+  // si el admin todavía no las tocó, usa el texto por defecto de
+  // src/lib/whatsapp.ts en vez de fallar o mostrar un mensaje vacío.
+  const plantillas = await prisma.plantillaMensaje.findMany({
+    where: { clave: { in: [CLAVE_PLANTILLA_CONFIRMACION_PEDIDO, CLAVE_PLANTILLA_PEDIDO_LISTO] } },
+  });
+  const cuerpoPlantilla = (clave: string) =>
+    plantillas.find((p) => p.clave === clave)?.cuerpo ??
+    PLANTILLAS_WHATSAPP_DEFECTO.find((p) => p.clave === clave)!.cuerpo;
 
   const linkTracker = `${SITE_URL}/estado-pedido/${pedido.codigo}`;
   const diasSecado = pedido.fechaInicioSecado
@@ -266,7 +281,7 @@ export default async function DetallePedidoPage({
           numero={pedido.cliente.telefono}
           tituloModal="Enviar confirmación de pedido"
           textoBoton="Enviar confirmación"
-          mensajeInicial={mensajeConfirmacionPedido({
+          mensajeInicial={renderPlantilla(cuerpoPlantilla(CLAVE_PLANTILLA_CONFIRMACION_PEDIDO), {
             nombreCliente: pedido.cliente.nombre,
             codigo: pedido.codigo,
             linkTracker,
@@ -277,7 +292,7 @@ export default async function DetallePedidoPage({
             numero={pedido.cliente.telefono}
             tituloModal="Avisar que el pedido está listo"
             textoBoton="Avisar que está listo"
-            mensajeInicial={mensajePedidoListo({
+            mensajeInicial={renderPlantilla(cuerpoPlantilla(CLAVE_PLANTILLA_PEDIDO_LISTO), {
               nombreCliente: pedido.cliente.nombre,
               codigo: pedido.codigo,
               fecha: pedido.fechaPrometida
