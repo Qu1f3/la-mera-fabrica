@@ -1,0 +1,74 @@
+name: Respaldo diario de la base de datos
+
+# Respaldo gratuito hecho a mano porque el plan Free de Supabase no incluye
+# copias de seguridad automaticas (solo Pro/Team en adelante). Corre todos
+# los dias, vuelca la base con pg_dump y sube el archivo a un bucket privado
+# de Supabase Storage. Guarda los ultimos RETENTION_DAYS respaldos y borra
+# los mas viejos para no consumir espacio de storage sin limite.
+#
+# Requiere estos secrets en GitHub (Settings -> Secrets and variables ->
+# Actions), con los mismos valores que ya estan en el .env de Vercel:
+#   DIRECT_URL                 -- conexion directa de Postgres (puerto 5432)
+#   NEXT_PUBLIC_SUPABASE_URL   -- URL del proyecto de Supabase
+#   SUPABASE_SERVICE_ROLE_KEY  -- service role key (nunca la anon key)
+#
+# Si un respaldo falla, GitHub le manda un correo automatico al dueno del
+# repo -- no hace falta configurar nada aparte para eso.
+
+on:
+  schedule:
+    # 08:00 UTC = 02:00 hora de Honduras (UTC-6). Corre de madrugada para no
+    # competir con trafico real del sitio.
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}
+
+env:
+  # Cuantos dias de respaldos guardar antes de borrar los mas viejos.
+  RETENTION_DAYS: "30"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verificar que existan los secrets necesarios
+        run: |
+          faltante=0
+          for var in DIRECT_URL NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Falta el secret $var en la configuracion del repositorio."
+              faltante=1
+            fi
+          done
+          exit $faltante
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Volcar la base de datos (pg_dump)
+        run: |
+          mkdir -p "$RUNNER_TEMP/backup"
+          fecha=$(date -u +%Y-%m-%d_%H%M%S)
+          echo "NOMBRE_ARCHIVO=backup-${fecha}.dump" >> "$GITHUB_ENV"
+          # Formato "custom" (-Fc): comprimido y permite restaurar
+          # selectivamente con pg_restore, a diferencia de un .sql plano.
+          # Se usa una imagen de Postgres reciente para el cliente pg_dump --
+          # un pg_dump mas nuevo que el servidor siempre puede volcarlo sin
+          # problema (el caso que NO funciona es al reves).
+          docker run --rm \
+            -e PGCONNECT_TIMEOUT=30 \
+            -v "$RUNNER_TEMP/backup:/backup" \
+            postgres:17-alpine \
+            pg_dump "${{ secrets.DIRECT_URL }}" --no-owner --no-privileges -Fc -f "/backup/backup-${fecha}.dump"
+          ls -lh "$RUNNER_TEMP/backup"
+
+      - name: Subir a Supabase Storage y limpiar respaldos viejos
+        working-directory: .github/scripts/backup
+        run: |
+          npm install --no-save --no-audit --no-fund
+          node upload.mjs "$RUNNER_TEMP/backup/${NOMBRE_ARCHIVO}" "${NOMBRE_ARCHIVO}"
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RETENTION_DAYS: ${{ env.RETENTION_DAYS }}

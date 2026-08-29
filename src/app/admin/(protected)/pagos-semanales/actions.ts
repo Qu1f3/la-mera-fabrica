@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export type PagoSemanalFormState = { error?: string };
 
@@ -105,7 +106,7 @@ export async function marcarPagoSemanalPagado(
     return { error: "El monto pagado no es válido." };
   }
 
-  await prisma.$transaction(async (tx) => {
+  const empleadoNombre = await prisma.$transaction(async (tx) => {
     const pago = await tx.pagoEmpleado.update({
       where: { id },
       data: { estado: "PAGADO", montoPagado, fechaPago },
@@ -126,6 +127,15 @@ export async function marcarPagoSemanalPagado(
       },
       update: { monto: montoPagado, fecha: fechaPago },
     });
+
+    return pago.empleado.nombre;
+  });
+
+  await registrarAuditoria({
+    accion: "marcar_pagado",
+    entidad: "PagoEmpleado",
+    entidadId: id,
+    detalle: `${empleadoNombre} -- L. ${montoPagado}`,
   });
 
   revalidatePath("/admin/pagos-semanales");
@@ -136,6 +146,10 @@ export async function marcarPagoSemanalPagado(
 
 export async function marcarPagoSemanalPendiente(id: string, _formData: FormData) {
   await requireAdmin();
+  const pagoPrevio = await prisma.pagoEmpleado.findUnique({
+    where: { id },
+    include: { empleado: true },
+  });
   await prisma.$transaction([
     prisma.pagoEmpleado.update({
       where: { id },
@@ -146,6 +160,12 @@ export async function marcarPagoSemanalPendiente(id: string, _formData: FormData
     // haya generado (si el pago nunca pasó por PAGADO).
     prisma.gasto.deleteMany({ where: { pagoEmpleadoId: id } }),
   ]);
+  await registrarAuditoria({
+    accion: "marcar_pendiente",
+    entidad: "PagoEmpleado",
+    entidadId: id,
+    detalle: pagoPrevio?.empleado.nombre,
+  });
   revalidatePath("/admin/pagos-semanales");
   revalidatePath("/admin/finanzas");
   revalidatePath("/admin/reportes");
@@ -153,6 +173,10 @@ export async function marcarPagoSemanalPendiente(id: string, _formData: FormData
 
 export async function eliminarPagoSemanal(id: string, _formData: FormData) {
   await requireAdmin();
+  const pagoPrevio = await prisma.pagoEmpleado.findUnique({
+    where: { id },
+    include: { empleado: true },
+  });
   // Sin onDelete: Cascade en el schema -- se borra a mano el gasto ligado
   // antes que el pago, mismo criterio que eliminarMovimiento con su Compra
   // huérfana en inventario/actions.ts.
@@ -160,6 +184,12 @@ export async function eliminarPagoSemanal(id: string, _formData: FormData) {
     prisma.gasto.deleteMany({ where: { pagoEmpleadoId: id } }),
     prisma.pagoEmpleado.delete({ where: { id } }),
   ]);
+  await registrarAuditoria({
+    accion: "eliminar",
+    entidad: "PagoEmpleado",
+    entidadId: id,
+    detalle: pagoPrevio?.empleado.nombre,
+  });
   revalidatePath("/admin/pagos-semanales");
   revalidatePath("/admin/finanzas");
   revalidatePath("/admin/reportes");

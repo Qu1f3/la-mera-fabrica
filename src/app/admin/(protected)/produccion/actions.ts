@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export type ProduccionFormState = { error?: string };
 
@@ -105,13 +106,25 @@ export async function registrarProduccion(
 
 export async function eliminarRegistroProduccion(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.registroProduccion.delete({ where: { id } });
+  const registro = await prisma.registroProduccion.delete({ where: { id } });
+  await registrarAuditoria({
+    accion: "eliminar",
+    entidad: "RegistroProduccion",
+    entidadId: id,
+    detalle: `${registro.cantidadProducida} unidad(es) -- L. ${registro.totalGanado}`,
+  });
   revalidatePath("/admin/produccion");
 }
 
 export async function eliminarRegistroMezcla(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.registroMezcla.delete({ where: { id } });
+  const registro = await prisma.registroMezcla.delete({ where: { id } });
+  await registrarAuditoria({
+    accion: "eliminar",
+    entidad: "RegistroMezcla",
+    entidadId: id,
+    detalle: `L. ${registro.monto}`,
+  });
   revalidatePath("/admin/produccion");
 }
 

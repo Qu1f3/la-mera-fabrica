@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export type TipoPagoExtraFormState = { error?: string };
 
@@ -93,6 +94,7 @@ export async function registrarPagoExtra(
 
 export async function eliminarPagoExtra(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.pagoExtraEmpleado.delete({ where: { id } });
+  const pago = await prisma.pagoExtraEmpleado.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "PagoExtraEmpleado", entidadId: id, detalle: `${pago.descripcion} (L. ${pago.monto})` });
   revalidatePath("/admin/extras");
 }

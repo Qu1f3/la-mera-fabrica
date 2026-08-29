@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 function fechaDesdeInput(valor: FormDataEntryValue | null): Date | null {
   const texto = String(valor ?? "").trim();
@@ -129,7 +130,8 @@ export async function eliminarMaterial(id: string, _formData: FormData) {
     );
   }
 
-  await prisma.materialInventario.delete({ where: { id } });
+  const material = await prisma.materialInventario.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "MaterialInventario", entidadId: id, detalle: material.nombre });
   revalidatePath("/admin/inventario");
   redirect("/admin/inventario");
 }
@@ -308,6 +310,13 @@ export async function eliminarMovimiento(id: string, _formData: FormData) {
     }
   });
 
+  await registrarAuditoria({
+    accion: "eliminar",
+    entidad: "MovimientoInventario",
+    entidadId: id,
+    detalle: `${movimiento.tipo} de ${material.nombre} (${movimiento.cantidad.toString()})`,
+  });
+
   revalidatePath("/admin/inventario");
   revalidatePath(`/admin/inventario/${movimiento.materialId}`);
   revalidatePath("/admin/finanzas");
@@ -357,6 +366,13 @@ export async function marcarCompraPagada(
         descripcion: `Compra${material ? ` de ${material.nombre}` : ""} a ${compra.proveedor.nombre} (pagada a crédito)`,
       },
     });
+  });
+
+  await registrarAuditoria({
+    accion: "marcar_pagada",
+    entidad: "Compra",
+    entidadId: compraId,
+    detalle: `L. ${compra.montoTotal.toString()} a ${compra.proveedor.nombre}`,
   });
 
   revalidatePath("/admin/inventario");
@@ -436,7 +452,8 @@ export async function eliminarProveedor(id: string, _formData: FormData) {
     );
   }
 
-  await prisma.proveedor.delete({ where: { id } });
+  const proveedor = await prisma.proveedor.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Proveedor", entidadId: id, detalle: proveedor.nombre });
   revalidatePath("/admin/inventario/proveedores");
   redirect("/admin/inventario/proveedores");
 }

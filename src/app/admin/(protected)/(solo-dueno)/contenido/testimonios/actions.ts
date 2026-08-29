@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 function calificacionOpcional(valor: FormDataEntryValue | null): number | null {
   const texto = String(valor ?? "").trim();
@@ -54,7 +55,8 @@ export async function actualizarTestimonio(id: string, formData: FormData) {
 
 export async function eliminarTestimonio(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.testimonio.delete({ where: { id } });
+  const testimonio = await prisma.testimonio.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Testimonio", entidadId: id, detalle: testimonio.nombreCliente });
   revalidatePath("/admin/contenido/testimonios");
   revalidatePath("/");
 }

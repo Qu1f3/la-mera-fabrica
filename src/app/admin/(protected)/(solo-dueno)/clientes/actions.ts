@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export type ClienteFormState = { error?: string };
 
@@ -72,7 +73,8 @@ export async function eliminarCliente(id: string, _formData: FormData) {
     );
   }
 
-  await prisma.cliente.delete({ where: { id } });
+  const cliente = await prisma.cliente.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Cliente", entidadId: id, detalle: cliente.nombre });
   revalidatePath("/admin/clientes");
   redirect("/admin/clientes");
 }

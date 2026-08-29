@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 import { generarCodigoPedido } from "@/lib/pedidoCodigo";
 import { calcularSubtotal, calcularTotalesPedido } from "@/lib/pedidoTotales";
 import type { EstadoPedido, EstadoEntrega, ItemPedidoFormulario } from "@/lib/types";
@@ -157,7 +158,7 @@ export async function cambiarEstadoPedido(pedidoId: string, formData: FormData) 
   const estado = String(formData.get("estado") || "") as EstadoPedido;
   const notas = String(formData.get("notas") || "").trim() || null;
 
-  await prisma.$transaction(async (tx) => {
+  const codigoPedido = await prisma.$transaction(async (tx) => {
     const pedidoActual = await tx.pedido.findUniqueOrThrow({ where: { id: pedidoId } });
 
     const data: Prisma.PedidoUpdateInput = { estado };
@@ -192,6 +193,15 @@ export async function cambiarEstadoPedido(pedidoId: string, formData: FormData) 
         });
       }
     }
+
+    return pedidoActual.codigo;
+  });
+
+  await registrarAuditoria({
+    accion: "cambiar_estado",
+    entidad: "Pedido",
+    entidadId: pedidoId,
+    detalle: `${codigoPedido} -> ${estado}`,
   });
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
@@ -266,6 +276,7 @@ export async function actualizarEstadoEntrega(entregaId: string, formData: FormD
 export async function eliminarEntrega(entregaId: string, _formData: FormData) {
   await requireAdmin();
   const entrega = await prisma.entrega.delete({ where: { id: entregaId } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Entrega", entidadId: entregaId, detalle: entrega.pedidoId });
   revalidatePath(`/admin/pedidos/${entrega.pedidoId}`);
   revalidatePath("/admin/calendario");
 }
@@ -275,7 +286,8 @@ export async function eliminarPedido(id: string, _formData: FormData) {
   // Los ingresos ya registrados no se borran -- solo se desvinculan de este
   // pedido, para no perder el historial financiero.
   await prisma.ingreso.updateMany({ where: { pedidoId: id }, data: { pedidoId: null } });
-  await prisma.pedido.delete({ where: { id } });
+  const pedido = await prisma.pedido.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Pedido", entidadId: id, detalle: pedido.codigo });
   revalidatePath("/admin/pedidos");
   redirect("/admin/pedidos");
 }

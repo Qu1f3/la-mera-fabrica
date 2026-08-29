@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { subirImagenProducto, borrarImagenProducto } from "@/lib/storage";
+import { registrarAuditoria } from "@/lib/auditoria";
 import type {
   Disponibilidad,
   TipoProducto,
@@ -156,7 +157,8 @@ export async function eliminarProducto(id: string, _formData: FormData) {
   // es la protección deliberada de ItemCotizacion.producto (ver
   // prisma/schema.prisma). Hoy no puede pasar porque Fase 3 no existe
   // todavía.
-  await prisma.producto.delete({ where: { id } });
+  const eliminado = await prisma.producto.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Producto", entidadId: id, detalle: eliminado.nombre });
 
   revalidatePath("/admin/productos");
   revalidatePath("/");

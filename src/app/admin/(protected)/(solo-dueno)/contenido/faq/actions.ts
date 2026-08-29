@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export async function crearFaq(formData: FormData) {
   await requireAdmin();
@@ -44,7 +45,8 @@ export async function actualizarFaq(id: string, formData: FormData) {
 
 export async function eliminarFaq(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.faq.delete({ where: { id } });
+  const faq = await prisma.faq.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Faq", entidadId: id, detalle: faq.pregunta });
   revalidatePath("/admin/contenido/faq");
   revalidatePath("/preguntas-frecuentes");
 }

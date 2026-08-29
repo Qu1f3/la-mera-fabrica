@@ -756,3 +756,28 @@ model PlantillaMensaje {
 
   @@map("plantillas_mensaje")
 }
+
+// ---------------------------------------------------------------------------
+// Sistema de gestion -- Auditoria
+// ---------------------------------------------------------------------------
+
+// Bitacora de acciones sensibles: quien hizo que y cuando. Solo se registran
+// acciones destructivas (borrar) o financieramente sensibles (marcar
+// pagado/pendiente, cambiar estado de un pedido) -- no cada lectura o
+// navegacion, eso generaria demasiado ruido para el tamano real de este
+// negocio. Se escribe desde src/lib/auditoria.ts::registrarAuditoria, llamado
+// al final de cada Server Action sensible (best-effort: si el registro falla,
+// nunca debe tumbar la accion real que se esta auditando).
+model RegistroAuditoria {
+  id           String   @id @default(cuid())
+  usuarioEmail String
+  accion       String
+  entidad      String
+  entidadId    String?
+  detalle      String?
+  creadoEn     DateTime @default(now())
+
+  @@index([entidad, entidadId])
+  @@index([creadoEn])
+  @@map("registros_auditoria")
+}

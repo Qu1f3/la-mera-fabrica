@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { subirImagenContenido, borrarImagenContenido } from "@/lib/storage";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 function limpio(valor: FormDataEntryValue | null): string | null {
   const texto = String(valor ?? "").trim();
@@ -106,7 +107,8 @@ export async function eliminarBanner(id: string, _formData: FormData) {
     await borrarImagenContenido(banner.imagenUrl);
   }
 
-  await prisma.banner.delete({ where: { id } });
+  const eliminado = await prisma.banner.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Banner", entidadId: id, detalle: eliminado.titulo });
 
   revalidatePath("/admin/contenido/banners");
   revalidatePath("/");

@@ -16,6 +16,7 @@ type ProductoOpcion = {
   categoria: string | null;
   diseno: string | null;
   precioActual: number;
+  imagenUrl?: string;
 };
 
 type FilaItem = {
@@ -125,6 +126,7 @@ export function NuevoPedidoForm({
         etiqueta: p.sku ? `${p.nombre} (${p.sku})` : p.nombre,
         subtexto: [p.tipo, p.categoria, p.diseno].filter(Boolean).join(" · ") +
           ` — L. ${p.precioActual}`,
+        imagenUrl: p.imagenUrl,
       })),
     [productos]
   );

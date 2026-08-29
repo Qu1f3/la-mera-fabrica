@@ -1,0 +1,9 @@
+{
+  "name": "backup-db-uploader",
+  "private": true,
+  "type": "module",
+  "description": "Script standalone (no forma parte de la app) que sube el respaldo de la base de datos a Supabase Storage y borra los respaldos mas viejos que RETENTION_DAYS. Vive aparte del package.json principal para no instalar toda la app (Next.js, React, etc.) solo para correr esto en GitHub Actions.",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3"
+  }
+}

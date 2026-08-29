@@ -26,6 +26,7 @@ export default async function NuevoPedidoPage({
         estilo: true,
         precioActual: true,
         categoria: { select: { nombre: true } },
+        imagenes: { select: { url: true }, orderBy: { orden: "asc" }, take: 1 },
       },
     }),
   ]);
@@ -48,6 +49,7 @@ export default async function NuevoPedidoPage({
             categoria: p.categoria?.nombre ?? null,
             diseno: p.estilo,
             precioActual: p.precioActual ? Number(p.precioActual) : 0,
+            imagenUrl: p.imagenes[0]?.url,
           }))}
           clienteIdInicial={clienteId ?? ""}
         />

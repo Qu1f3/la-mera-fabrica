@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 async function generarSlugUnico(base: string, ignorarId?: string) {
   const raiz = slugify(base) || "categoria";
@@ -63,7 +64,8 @@ export async function actualizarCategoria(id: string, formData: FormData) {
 
 export async function eliminarCategoria(id: string, _formData: FormData) {
   await requireAdmin();
-  await prisma.categoria.delete({ where: { id } });
+  const categoria = await prisma.categoria.delete({ where: { id } });
+  await registrarAuditoria({ accion: "eliminar", entidad: "Categoria", entidadId: id, detalle: categoria.nombre });
   revalidatePath("/admin/categorias");
   revalidatePath("/");
 }
