@@ -31,6 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Descargar el codigo del repositorio
+        uses: actions/checkout@v4
+
       - name: Verificar que existan los secrets necesarios
         run: |
           faltante=0
