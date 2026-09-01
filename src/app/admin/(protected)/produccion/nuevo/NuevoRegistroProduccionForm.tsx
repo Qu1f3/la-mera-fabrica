@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { registrarProduccion } from "../actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 import { Combobox } from "@/components/admin/ui/Combobox";
 
 const inputClass =
@@ -22,6 +23,7 @@ export function NuevoRegistroProduccionForm({
   montoMezclaDefault: string;
 }) {
   const [state, formAction, pending] = useActionState(registrarProduccion, {});
+  useToastAccion(state, "Registro de producción guardado.");
   const [empleadoId, setEmpleadoId] = useState("");
   const [productoId, setProductoId] = useState("");
   const [hizoMezcla, setHizoMezcla] = useState(false);

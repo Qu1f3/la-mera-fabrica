@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { marcarPagoSemanalPagado } from "./actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 
 export function MarcarPagadoForm({
   pagoId,
@@ -15,6 +16,7 @@ export function MarcarPagadoForm({
     marcarPagoSemanalPagado.bind(null, pagoId),
     {}
   );
+  useToastAccion(state, "Pago marcado como pagado.");
 
   if (!abierto) {
     return (

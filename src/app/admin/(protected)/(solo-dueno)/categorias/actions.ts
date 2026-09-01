@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { registrarAuditoria } from "@/lib/auditoria";
 
+export type EstadoCategoria = { error?: string };
+
 async function generarSlugUnico(base: string, ignorarId?: string) {
   const raiz = slugify(base) || "categoria";
   let slug = raiz;
@@ -22,10 +24,13 @@ async function generarSlugUnico(base: string, ignorarId?: string) {
   }
 }
 
-export async function crearCategoria(formData: FormData) {
+export async function crearCategoria(
+  _prevState: EstadoCategoria,
+  formData: FormData
+): Promise<EstadoCategoria> {
   await requireAdmin();
   const nombre = String(formData.get("nombre") || "").trim();
-  if (!nombre) return;
+  if (!nombre) return { error: "El nombre es obligatorio." };
 
   const slugDeseado = String(formData.get("slug") || "").trim() || nombre;
   const slug = await generarSlugUnico(slugDeseado);
@@ -37,12 +42,17 @@ export async function crearCategoria(formData: FormData) {
 
   revalidatePath("/admin/categorias");
   revalidatePath("/");
+  return {};
 }
 
-export async function actualizarCategoria(id: string, formData: FormData) {
+export async function actualizarCategoria(
+  id: string,
+  _prevState: EstadoCategoria,
+  formData: FormData
+): Promise<EstadoCategoria> {
   await requireAdmin();
   const nombre = String(formData.get("nombre") || "").trim();
-  if (!nombre) return;
+  if (!nombre) return { error: "El nombre es obligatorio." };
 
   const slugDeseado = String(formData.get("slug") || "").trim() || nombre;
   const slug = await generarSlugUnico(slugDeseado, id);
@@ -60,12 +70,18 @@ export async function actualizarCategoria(id: string, formData: FormData) {
 
   revalidatePath("/admin/categorias");
   revalidatePath("/");
+  return {};
 }
 
-export async function eliminarCategoria(id: string, _formData: FormData) {
+export async function eliminarCategoria(
+  id: string,
+  _prevState: EstadoCategoria,
+  _formData: FormData
+): Promise<EstadoCategoria> {
   await requireAdmin();
   const categoria = await prisma.categoria.delete({ where: { id } });
   await registrarAuditoria({ accion: "eliminar", entidad: "Categoria", entidadId: id, detalle: categoria.nombre });
   revalidatePath("/admin/categorias");
   revalidatePath("/");
+  return {};
 }

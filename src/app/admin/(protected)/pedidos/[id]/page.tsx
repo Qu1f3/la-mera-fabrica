@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { EstadoBadge } from "@/components/admin/ui/EstadoBadge";
-import { SelectorEstado } from "@/components/admin/ui/SelectorEstado";
 import { CopiarBoton } from "@/components/admin/ui/CopiarBoton";
 import { Tabs } from "@/components/admin/ui/Tabs";
 import { EnviarWhatsAppModal } from "@/components/admin/EnviarWhatsAppModal";
@@ -22,20 +20,15 @@ import { SITE_URL } from "@/lib/site";
 import {
   COLOR_ESTADO_PEDIDO,
   ETIQUETA_ESTADO_PEDIDO,
-  COLOR_ESTADO_ENTREGA,
-  ETIQUETA_ESTADO_ENTREGA,
   type EstadoPedido,
   type EstadoEntrega,
 } from "@/lib/types";
-import {
-  asignarFechaPrometida,
-  cambiarEstadoPedido,
-  eliminarPedido,
-  registrarRiego,
-  crearEntrega,
-  actualizarEstadoEntrega,
-  eliminarEntrega,
-} from "../actions";
+import { CambiarEstadoPedidoForm } from "./CambiarEstadoPedidoForm";
+import { AsignarFechaPrometidaForm } from "./AsignarFechaPrometidaForm";
+import { RegistrarRiegoForm } from "./RegistrarRiegoForm";
+import { CrearEntregaForm } from "./CrearEntregaForm";
+import { FilaEntrega } from "./FilaEntrega";
+import { EliminarPedidoForm } from "./EliminarPedidoForm";
 
 export const metadata = { title: "Detalle de pedido — Panel administrativo" };
 
@@ -111,90 +104,15 @@ export default async function DetallePedidoPage({
 
   const tabEntregas = (
     <div>
-      <form
-        action={crearEntrega.bind(null, pedido.id)}
-        className="flex flex-wrap items-end gap-2"
-      >
-        <label className="text-sm text-neutral-700">
-          Fecha programada (opcional)
-          <input
-            type="date"
-            name="fechaProgramada"
-            className="mt-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
-          />
-        </label>
-        <input
-          name="notas"
-          placeholder="Notas (opcional)"
-          className="min-w-[180px] flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
-        />
-        <button
-          type="submit"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
-        >
-          Programar entrega
-        </button>
-      </form>
+      <CrearEntregaForm pedidoId={pedido.id} />
 
       <ul className="mt-4 space-y-3">
         {pedido.entregas.map((entrega) => (
-          <li key={entrega.id} className="rounded-lg border border-neutral-200 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm">
-                <p className="font-medium text-neutral-900">
-                  {entrega.fechaProgramada
-                    ? `Programada: ${formatearFechaHonduras(entrega.fechaProgramada)}`
-                    : "Sin fecha programada"}
-                </p>
-                {entrega.fechaReal && (
-                  <p className="text-neutral-500">
-                    Entregada el {formatearFechaHonduras(entrega.fechaReal)}
-                  </p>
-                )}
-              </div>
-              <EstadoBadge
-                label={ETIQUETA_ESTADO_ENTREGA[entrega.estado as EstadoEntrega]}
-                colorClasses={COLOR_ESTADO_ENTREGA[entrega.estado as EstadoEntrega]}
-              />
-            </div>
-            {entrega.notas && (
-              <p className="mt-1 text-sm text-neutral-600">{entrega.notas}</p>
-            )}
-            <form
-              action={actualizarEstadoEntrega.bind(null, entrega.id)}
-              className="mt-2 flex flex-wrap items-end gap-2"
-            >
-              <SelectorEstado
-                nombre="estado"
-                valorInicial={entrega.estado}
-                opciones={ESTADOS_ENTREGA.map((estado) => ({
-                  valor: estado,
-                  etiqueta: ETIQUETA_ESTADO_ENTREGA[estado],
-                  colorClasses: COLOR_ESTADO_ENTREGA[estado],
-                }))}
-              />
-              <input
-                name="notas"
-                placeholder="Nota (opcional)"
-                defaultValue={entrega.notas ?? ""}
-                className="min-w-[160px] flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-900"
-              />
-              <button
-                type="submit"
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-              >
-                Guardar
-              </button>
-            </form>
-            <form action={eliminarEntrega.bind(null, entrega.id)} className="mt-2">
-              <ConfirmSubmitButton
-                confirmMessage="¿Borrar esta entrega programada? Esto no se puede deshacer."
-                className="text-xs font-medium text-red-600 hover:underline"
-              >
-                Borrar
-              </ConfirmSubmitButton>
-            </form>
-          </li>
+          <FilaEntrega
+            key={entrega.id}
+            entrega={entrega}
+            estadosEntrega={ESTADOS_ENTREGA}
+          />
         ))}
         {pedido.entregas.length === 0 && (
           <li className="py-4 text-center text-sm text-neutral-500">
@@ -207,24 +125,7 @@ export default async function DetallePedidoPage({
 
   const tabRiego = (
     <div>
-      <form
-        action={registrarRiego.bind(null, pedido.id)}
-        className="flex flex-wrap items-end gap-2"
-      >
-        <label className="flex-1 text-sm text-neutral-700">
-          Observación (opcional)
-          <input
-            name="observacion"
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none"
-          />
-        </label>
-        <button
-          type="submit"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
-        >
-          Registrar riego de hoy
-        </button>
-      </form>
+      <RegistrarRiegoForm pedidoId={pedido.id} />
       <ul className="mt-4 divide-y divide-neutral-100">
         {pedido.riegos.map((riego) => (
           <li key={riego.id} className="py-2.5 text-sm">
@@ -323,30 +224,14 @@ export default async function DetallePedidoPage({
 
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-neutral-900">Fechas</h2>
-          <form
-            action={asignarFechaPrometida.bind(null, pedido.id)}
-            className="mt-1 flex flex-wrap items-end gap-2"
-          >
-            <label className="text-sm text-neutral-700">
-              Fecha prometida
-              <input
-                type="date"
-                name="fechaPrometida"
-                defaultValue={
-                  pedido.fechaPrometida
-                    ? pedido.fechaPrometida.toISOString().slice(0, 10)
-                    : ""
-                }
-                className="mt-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
-              />
-            </label>
-            <button
-              type="submit"
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-            >
-              Guardar
-            </button>
-          </form>
+          <AsignarFechaPrometidaForm
+            pedidoId={pedido.id}
+            fechaInicial={
+              pedido.fechaPrometida
+                ? pedido.fechaPrometida.toISOString().slice(0, 10)
+                : ""
+            }
+          />
           {pedido.fechaEntregaReal && (
             <p className="mt-2 text-sm text-neutral-600">
               Entregado el {formatearFechaHonduras(pedido.fechaEntregaReal)}
@@ -408,31 +293,11 @@ export default async function DetallePedidoPage({
 
       <section className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-neutral-900">Cambiar estado</h2>
-        <form
-          action={cambiarEstadoPedido.bind(null, pedido.id)}
-          className="mt-2 flex flex-wrap items-end gap-2"
-        >
-          <SelectorEstado
-            nombre="estado"
-            valorInicial={pedido.estado}
-            opciones={ESTADOS.map((estado) => ({
-              valor: estado,
-              etiqueta: ETIQUETA_ESTADO_PEDIDO[estado],
-              colorClasses: COLOR_ESTADO_PEDIDO[estado],
-            }))}
-          />
-          <input
-            name="notas"
-            placeholder="Nota opcional del cambio"
-            className="min-w-[200px] flex-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-900"
-          />
-          <button
-            type="submit"
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-          >
-            Guardar
-          </button>
-        </form>
+        <CambiarEstadoPedidoForm
+          pedidoId={pedido.id}
+          estadoActual={pedido.estado}
+          estados={ESTADOS}
+        />
       </section>
 
       <section className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
@@ -450,14 +315,7 @@ export default async function DetallePedidoPage({
         <p className="mt-1 text-sm text-neutral-600">
           Borrar este pedido no se puede deshacer.
         </p>
-        <form action={eliminarPedido.bind(null, pedido.id)} className="mt-3">
-          <ConfirmSubmitButton
-            confirmMessage={`¿Borrar el pedido #${pedido.codigo} para siempre? Esto no se puede deshacer.`}
-            className="rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
-          >
-            Borrar pedido
-          </ConfirmSubmitButton>
-        </form>
+        <EliminarPedidoForm id={pedido.id} codigo={pedido.codigo} />
       </section>
     </div>
   );

@@ -4,12 +4,17 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
+export type EstadoConfiguracion = { error?: string };
+
 function limpio(valor: FormDataEntryValue | null): string | null {
   const texto = String(valor ?? "").trim();
   return texto.length > 0 ? texto : null;
 }
 
-export async function actualizarConfiguracion(formData: FormData) {
+export async function actualizarConfiguracion(
+  _prevState: EstadoConfiguracion,
+  formData: FormData
+): Promise<EstadoConfiguracion> {
   await requireAdmin();
   await prisma.configuracion.upsert({
     where: { id: "global" },
@@ -37,6 +42,7 @@ export async function actualizarConfiguracion(formData: FormData) {
   // todo en vez de una sola ruta.
   revalidatePath("/", "layout");
   revalidatePath("/admin/configuracion");
+  return {};
 }
 
 /**
@@ -45,10 +51,14 @@ export async function actualizarConfiguracion(formData: FormData) {
  * texto por defecto de src/lib/whatsapp.ts la primera vez que hacen falta).
  * Solo se edita el cuerpo del mensaje, nunca la clave que la identifica.
  */
-export async function actualizarPlantilla(clave: string, formData: FormData) {
+export async function actualizarPlantilla(
+  clave: string,
+  _prevState: EstadoConfiguracion,
+  formData: FormData
+): Promise<EstadoConfiguracion> {
   await requireAdmin();
   const cuerpo = String(formData.get("cuerpo") || "").trim();
-  if (!cuerpo) return;
+  if (!cuerpo) return { error: "El mensaje no puede quedar vacío." };
 
   await prisma.plantillaMensaje.update({ where: { clave }, data: { cuerpo } });
 
@@ -56,4 +66,5 @@ export async function actualizarPlantilla(clave: string, formData: FormData) {
   // "layout" porque el mensaje se usa en /admin/pedidos/[id], una ruta
   // dinámica -- revalidar solo "/admin/pedidos" no alcanzaría los detalles.
   revalidatePath("/admin/pedidos", "layout");
+  return {};
 }

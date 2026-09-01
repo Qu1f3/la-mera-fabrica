@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { ProductoFormState } from "./actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 import { disenosPermitidos } from "@/lib/disenoMosaico";
 import type {
   Disponibilidad,
@@ -64,6 +65,10 @@ export function ProductoForm({
 }) {
   const valores = valoresIniciales ?? VALORES_VACIOS;
   const [state, formAction, pending] = useActionState(action, {});
+  useToastAccion(
+    state,
+    valoresIniciales ? "Producto actualizado." : "Producto creado."
+  );
   const [tipo, setTipo] = useState<TipoProducto>(valores.tipo);
   const [categoriaId, setCategoriaId] = useState(valores.categoriaId ?? "");
   const [estilo, setEstilo] = useState(valores.estilo ?? "");

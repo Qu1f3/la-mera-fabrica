@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { guardarPagoUnitario } from "../actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 
 export function PagoUnitarioRow({
   productoId,
@@ -13,6 +14,7 @@ export function PagoUnitarioRow({
   montoActual: string;
 }) {
   const [state, formAction, pending] = useActionState(guardarPagoUnitario, {});
+  useToastAccion(state, "Pago por unidad actualizado.");
 
   return (
     <tr className="hover:bg-neutral-50">

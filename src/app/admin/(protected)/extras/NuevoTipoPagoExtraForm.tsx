@@ -2,12 +2,14 @@
 
 import { useActionState, useState } from "react";
 import { crearTipoPagoExtra } from "./actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 
 const inputClass =
   "rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none";
 
 export function NuevoTipoPagoExtraForm() {
   const [state, formAction, pending] = useActionState(crearTipoPagoExtra, {});
+  useToastAccion(state, "Tipo de pago creado.");
   const [signo, setSigno] = useState<"SUMA" | "RESTA">("SUMA");
 
   return (

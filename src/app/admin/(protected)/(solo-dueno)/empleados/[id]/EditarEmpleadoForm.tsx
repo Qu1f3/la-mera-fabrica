@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { actualizarEmpleado } from "../actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 
 const inputClass =
   "rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none";
@@ -23,6 +24,7 @@ export function EditarEmpleadoForm({
     actualizarEmpleado.bind(null, empleadoId),
     {}
   );
+  useToastAccion(state, "Empleado actualizado.");
 
   return (
     <form action={formAction} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -7,6 +7,7 @@ import { ETIQUETA_UNIDAD } from "@/lib/types";
 import { piezasDeMosaico } from "@/lib/cobertura";
 import { trackEvent } from "@/lib/analytics";
 import { crearSolicitudCotizacion } from "./actions";
+import { useToast } from "@/components/catalogo/Toast";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-terracota focus:outline-none";
@@ -15,6 +16,7 @@ const inputClassError =
 
 export function CotizacionClient() {
   const { items, actualizarCantidad, quitarItem, vaciar } = useCart();
+  const { mostrarToast } = useToast();
   const [nombreCliente, setNombreCliente] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
@@ -89,6 +91,7 @@ export function CotizacionClient() {
           setErroresCampo((previo) => ({ ...previo, telefono: resultado.error }));
         } else {
           setError(resultado.error);
+          mostrarToast(resultado.error, "error");
         }
         return;
       }

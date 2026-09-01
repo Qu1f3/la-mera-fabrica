@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { registrarPagoExtra } from "./actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 import { Combobox } from "@/components/admin/ui/Combobox";
 
 const inputClass =
@@ -37,11 +38,31 @@ export function NuevoPagoExtraForm({
   tipos: TipoOpcion[];
 }) {
   const [state, formAction, pending] = useActionState(registrarPagoExtra, {});
+  useToastAccion(state, "Pago extra registrado.");
   const [empleadoId, setEmpleadoId] = useState("");
   const [seleccion, setSeleccion] = useState(""); // "" | OTRO | id de un TipoPagoExtra
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [mostrarNotas, setMostrarNotas] = useState(false);
+
+  // Al registrar el pago con éxito, se limpia todo el formulario -- si los
+  // campos se quedan llenos con el último pago, mi mamá no está segura de
+  // que se guardó y le da doble click a "Registrar pago extra".
+  const primerRender = useRef(true);
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false;
+      return;
+    }
+    if (!state.error) {
+      setEmpleadoId("");
+      setSeleccion("");
+      setDescripcion("");
+      setMonto("");
+      setMostrarNotas(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   const opcionesEmpleado = useMemo(
     () => empleados.map((e) => ({ id: e.id, etiqueta: e.nombre })),

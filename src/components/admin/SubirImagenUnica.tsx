@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { comprimirImagen } from "@/lib/img/comprimirImagen";
+import { useToast } from "@/components/admin/ui/Toast";
 
 /**
  * Versión de un solo archivo del mismo patrón que
@@ -22,6 +23,7 @@ export function SubirImagenUnica({
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { mostrarToast } = useToast();
 
   async function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -40,14 +42,18 @@ export function SubirImagenUnica({
         try {
           await accion(formData);
           if (inputRef.current) inputRef.current.value = "";
+          mostrarToast("Imagen subida.");
         } catch {
-          setError(
-            "No se pudo subir la imagen. Intenta de nuevo — si el problema sigue, prueba con una foto más liviana o de menor resolución."
-          );
+          const mensaje =
+            "No se pudo subir la imagen. Intenta de nuevo — si el problema sigue, prueba con una foto más liviana o de menor resolución.";
+          setError(mensaje);
+          mostrarToast(mensaje, "error");
         }
       });
     } catch {
-      setError("No se pudo preparar la imagen para subir. Intenta de nuevo.");
+      const mensaje = "No se pudo preparar la imagen para subir. Intenta de nuevo.";
+      setError(mensaje);
+      mostrarToast(mensaje, "error");
     } finally {
       setProcesando(false);
     }

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { actualizarCliente } from "../actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 
 const inputClass =
   "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none";
@@ -21,6 +22,7 @@ export function EditarClienteForm({
     actualizarCliente.bind(null, clienteId),
     {}
   );
+  useToastAccion(state, "Cliente actualizado.");
 
   return (
     <form action={formAction} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { generarPagoSemanal } from "./actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 import { Combobox } from "@/components/admin/ui/Combobox";
 
 const inputClass =
@@ -13,6 +14,7 @@ export function NuevoPagoSemanalForm({
   empleados: { id: string; nombre: string }[];
 }) {
   const [state, formAction, pending] = useActionState(generarPagoSemanal, {});
+  useToastAccion(state, "Pago semanal generado.");
   const [empleadoId, setEmpleadoId] = useState("");
 
   const opcionesEmpleado = useMemo(

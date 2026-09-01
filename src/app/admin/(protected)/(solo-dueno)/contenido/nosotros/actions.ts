@@ -7,7 +7,12 @@ import { subirImagenContenido, borrarImagenContenido } from "@/lib/storage";
 
 const CLAVE = "nosotros";
 
-export async function actualizarNosotros(formData: FormData) {
+export type EstadoNosotros = { error?: string };
+
+export async function actualizarNosotros(
+  _prevState: EstadoNosotros,
+  formData: FormData
+): Promise<EstadoNosotros> {
   await requireAdmin();
   const titulo = String(formData.get("titulo") || "").trim() || "Nosotros";
   const cuerpo = String(formData.get("cuerpo") || "").trim() || null;
@@ -20,6 +25,7 @@ export async function actualizarNosotros(formData: FormData) {
 
   revalidatePath("/admin/contenido/nosotros");
   revalidatePath("/nosotros");
+  return {};
 }
 
 export async function subirImagenNosotros(formData: FormData) {
@@ -48,13 +54,16 @@ export async function subirImagenNosotros(formData: FormData) {
   revalidatePath("/nosotros");
 }
 
-export async function borrarImagenNosotros(_formData: FormData) {
+export async function borrarImagenNosotros(
+  _prevState: EstadoNosotros,
+  _formData: FormData
+): Promise<EstadoNosotros> {
   await requireAdmin();
   const existente = await prisma.seccionContenido.findUnique({
     where: { clave: CLAVE },
     select: { imagenUrl: true },
   });
-  if (!existente?.imagenUrl) return;
+  if (!existente?.imagenUrl) return {};
 
   await borrarImagenContenido(existente.imagenUrl);
   await prisma.seccionContenido.update({
@@ -64,4 +73,5 @@ export async function borrarImagenNosotros(_formData: FormData) {
 
   revalidatePath("/admin/contenido/nosotros");
   revalidatePath("/nosotros");
+  return {};
 }

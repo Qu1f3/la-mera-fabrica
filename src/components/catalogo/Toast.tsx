@@ -1,11 +1,15 @@
 "use client";
 
+/**
+ * Igual patrón que src/components/admin/ui/Toast.tsx, pero con el estilo
+ * del sitio público (paleta terracota/arena/piedra/carbon) en vez del
+ * neutro del panel administrativo -- ver src/app/globals.css. Se monta una
+ * sola vez en (public)/layout.tsx.
+ */
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -24,12 +28,6 @@ const ToastContext = createContext<ToastContextValor | null>(null);
 
 let siguienteId = 1;
 
-/**
- * Proveedor de toasts para el panel. Se monta una sola vez en el layout
- * protegido; cualquier componente cliente de /admin puede usar useToast()
- * para mostrar un mensaje corto (ej: "Código copiado", "Guardado") sin
- * bloquear la pantalla como haría un alert().
- */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -55,7 +53,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             className={`pointer-events-auto rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg ${
               toast.tipo === "error"
                 ? "bg-red-600 text-white"
-                : "bg-neutral-900 text-white"
+                : "bg-carbon text-white"
             }`}
           >
             {toast.mensaje}
@@ -72,36 +70,4 @@ export function useToast() {
     throw new Error("useToast() debe usarse dentro de <ToastProvider>.");
   }
   return contexto;
-}
-
-/**
- * Muestra un toast automáticamente después de cada envío de un formulario
- * conectado a useActionState: rojo con el mensaje de `state.error` si la
- * Server Action falló, o `mensajeExito` si no. No dispara nada en el primer
- * render (antes de cualquier envío) -- solo cuando `state` cambia como
- * resultado real de una Server Action. Pensado para no tener que repetir
- * este mismo useEffect a mano en cada formulario del panel.
- */
-export function useToastAccion(
-  state: { error?: string },
-  mensajeExito: string
-) {
-  const { mostrarToast } = useToast();
-  const primerRender = useRef(true);
-
-  useEffect(() => {
-    if (primerRender.current) {
-      primerRender.current = false;
-      return;
-    }
-    if (state.error) {
-      mostrarToast(state.error, "error");
-    } else {
-      mostrarToast(mensajeExito);
-    }
-    // Solo nos interesa reaccionar a cambios de `state` (un nuevo resultado
-    // de la Server Action); mostrarToast/mensajeExito son estables o no
-    // deben re-disparar el toast por sí solos.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
 }

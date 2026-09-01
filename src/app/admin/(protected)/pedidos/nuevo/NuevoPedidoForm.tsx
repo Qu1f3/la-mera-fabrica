@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { crearPedido } from "../actions";
 import { crearClienteInline } from "../../(solo-dueno)/clientes/actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 import { calcularSubtotal, calcularTotalesPedido, type EntradaAnticipo } from "@/lib/pedidoTotales";
 import { Combobox } from "@/components/admin/ui/Combobox";
 import { claveDiaHonduras } from "@/lib/fecha";
@@ -79,10 +80,12 @@ export function NuevoPedidoForm({
     crearClienteInline,
     {}
   );
+  useToastAccion(estadoCliente, "Cliente agregado.");
   const [estadoPedido, formActionPedido, guardandoPedido] = useActionState(
     crearPedido,
     {}
   );
+  useToastAccion(estadoPedido, "Pedido creado.");
 
   // Patrón recomendado por React para "ajustar estado cuando cambia una
   // prop/valor derivado" -- se llama a setState durante el render (no

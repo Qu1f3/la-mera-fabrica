@@ -151,7 +151,11 @@ export async function crearPedido(
   redirect(`/admin/pedidos/${pedido.id}`);
 }
 
-export async function cambiarEstadoPedido(pedidoId: string, formData: FormData) {
+export async function cambiarEstadoPedido(
+  pedidoId: string,
+  _prevState: PedidoFormState,
+  formData: FormData
+): Promise<PedidoFormState> {
   const user = await requireAdmin();
   const adminUsuario = await obtenerAdminUsuario(user);
 
@@ -208,19 +212,29 @@ export async function cambiarEstadoPedido(pedidoId: string, formData: FormData) 
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin/finanzas");
   revalidatePath("/admin/reportes");
+  return {};
 }
 
-export async function asignarFechaPrometida(pedidoId: string, formData: FormData) {
+export async function asignarFechaPrometida(
+  pedidoId: string,
+  _prevState: PedidoFormState,
+  formData: FormData
+): Promise<PedidoFormState> {
   await requireAdmin();
   const fechaPrometida = fechaDesdeInput(formData.get("fechaPrometida"));
-  if (!fechaPrometida) return;
+  if (!fechaPrometida) return { error: "La fecha no es válida." };
 
   await prisma.pedido.update({ where: { id: pedidoId }, data: { fechaPrometida } });
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/pedidos");
+  return {};
 }
 
-export async function registrarRiego(pedidoId: string, formData: FormData) {
+export async function registrarRiego(
+  pedidoId: string,
+  _prevState: PedidoFormState,
+  formData: FormData
+): Promise<PedidoFormState> {
   const user = await requireAdmin();
   const adminUsuario = await obtenerAdminUsuario(user);
   const observacion = String(formData.get("observacion") || "").trim() || null;
@@ -230,6 +244,7 @@ export async function registrarRiego(pedidoId: string, formData: FormData) {
   });
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
+  return {};
 }
 
 // Programar/completar la entrega de un pedido es independiente de
@@ -237,7 +252,11 @@ export async function registrarRiego(pedidoId: string, formData: FormData) {
 // a ENTREGADO) -- Entrega existe aparte para poder programar la fecha con
 // anticipación y para el caso (raro) de que un pedido se reparta en varias
 // tandas de entrega.
-export async function crearEntrega(pedidoId: string, formData: FormData) {
+export async function crearEntrega(
+  pedidoId: string,
+  _prevState: PedidoFormState,
+  formData: FormData
+): Promise<PedidoFormState> {
   await requireAdmin();
   const fechaProgramada = fechaDesdeInput(formData.get("fechaProgramada"));
   const notas = String(formData.get("notas") || "").trim() || null;
@@ -246,15 +265,20 @@ export async function crearEntrega(pedidoId: string, formData: FormData) {
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/calendario");
+  return {};
 }
 
-export async function actualizarEstadoEntrega(entregaId: string, formData: FormData) {
+export async function actualizarEstadoEntrega(
+  entregaId: string,
+  _prevState: PedidoFormState,
+  formData: FormData
+): Promise<PedidoFormState> {
   await requireAdmin();
   const estado = String(formData.get("estado") || "") as EstadoEntrega;
   const notas = String(formData.get("notas") || "").trim() || null;
 
   const entregaActual = await prisma.entrega.findUnique({ where: { id: entregaId } });
-  if (!entregaActual) return;
+  if (!entregaActual) return { error: "Esta entrega ya no existe." };
 
   await prisma.entrega.update({
     where: { id: entregaId },
@@ -271,17 +295,27 @@ export async function actualizarEstadoEntrega(entregaId: string, formData: FormD
 
   revalidatePath(`/admin/pedidos/${entregaActual.pedidoId}`);
   revalidatePath("/admin/calendario");
+  return {};
 }
 
-export async function eliminarEntrega(entregaId: string, _formData: FormData) {
+export async function eliminarEntrega(
+  entregaId: string,
+  _prevState: PedidoFormState,
+  _formData: FormData
+): Promise<PedidoFormState> {
   await requireAdmin();
   const entrega = await prisma.entrega.delete({ where: { id: entregaId } });
   await registrarAuditoria({ accion: "eliminar", entidad: "Entrega", entidadId: entregaId, detalle: entrega.pedidoId });
   revalidatePath(`/admin/pedidos/${entrega.pedidoId}`);
   revalidatePath("/admin/calendario");
+  return {};
 }
 
-export async function eliminarPedido(id: string, _formData: FormData) {
+export async function eliminarPedido(
+  id: string,
+  _prevState: PedidoFormState,
+  _formData: FormData
+): Promise<PedidoFormState> {
   await requireAdmin();
   // Los ingresos ya registrados no se borran -- solo se desvinculan de este
   // pedido, para no perder el historial financiero.

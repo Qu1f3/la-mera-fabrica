@@ -7,10 +7,13 @@ import { prisma } from "@/lib/prisma";
 import type { EstadoCotizacion } from "@/lib/types";
 import { registrarAuditoria } from "@/lib/auditoria";
 
+export type EstadoAccionCotizacion = { error?: string };
+
 export async function actualizarEstadoCotizacion(
   id: string,
+  _prevState: EstadoAccionCotizacion,
   formData: FormData
-) {
+): Promise<EstadoAccionCotizacion> {
   await requireAdmin();
   const estado = String(formData.get("estado") || "NUEVA") as EstadoCotizacion;
 
@@ -21,9 +24,14 @@ export async function actualizarEstadoCotizacion(
 
   revalidatePath("/admin/cotizaciones");
   revalidatePath(`/admin/cotizaciones/${id}`);
+  return {};
 }
 
-export async function eliminarCotizacion(id: string, _formData: FormData) {
+export async function eliminarCotizacion(
+  id: string,
+  _prevState: EstadoAccionCotizacion,
+  _formData: FormData
+): Promise<EstadoAccionCotizacion> {
   await requireAdmin();
   const cotizacion = await prisma.solicitudCotizacion.delete({ where: { id } });
   await registrarAuditoria({ accion: "eliminar", entidad: "SolicitudCotizacion", entidadId: id, detalle: cotizacion.nombreCliente });

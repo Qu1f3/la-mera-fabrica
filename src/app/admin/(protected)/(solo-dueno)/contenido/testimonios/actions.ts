@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
 
+export type EstadoTestimonio = { error?: string };
+
 function calificacionOpcional(valor: FormDataEntryValue | null): number | null {
   const texto = String(valor ?? "").trim();
   if (!texto) return null;
@@ -13,11 +15,16 @@ function calificacionOpcional(valor: FormDataEntryValue | null): number | null {
   return Math.min(5, Math.max(1, Math.round(numero)));
 }
 
-export async function crearTestimonio(formData: FormData) {
+export async function crearTestimonio(
+  _prevState: EstadoTestimonio,
+  formData: FormData
+): Promise<EstadoTestimonio> {
   await requireAdmin();
   const nombreCliente = String(formData.get("nombreCliente") || "").trim();
   const texto = String(formData.get("texto") || "").trim();
-  if (!nombreCliente || !texto) return;
+  if (!nombreCliente || !texto) {
+    return { error: "El nombre del cliente y el testimonio son obligatorios." };
+  }
 
   await prisma.testimonio.create({
     data: {
@@ -30,13 +37,20 @@ export async function crearTestimonio(formData: FormData) {
 
   revalidatePath("/admin/contenido/testimonios");
   revalidatePath("/");
+  return {};
 }
 
-export async function actualizarTestimonio(id: string, formData: FormData) {
+export async function actualizarTestimonio(
+  id: string,
+  _prevState: EstadoTestimonio,
+  formData: FormData
+): Promise<EstadoTestimonio> {
   await requireAdmin();
   const nombreCliente = String(formData.get("nombreCliente") || "").trim();
   const texto = String(formData.get("texto") || "").trim();
-  if (!nombreCliente || !texto) return;
+  if (!nombreCliente || !texto) {
+    return { error: "El nombre del cliente y el testimonio son obligatorios." };
+  }
 
   await prisma.testimonio.update({
     where: { id },
@@ -51,12 +65,18 @@ export async function actualizarTestimonio(id: string, formData: FormData) {
 
   revalidatePath("/admin/contenido/testimonios");
   revalidatePath("/");
+  return {};
 }
 
-export async function eliminarTestimonio(id: string, _formData: FormData) {
+export async function eliminarTestimonio(
+  id: string,
+  _prevState: EstadoTestimonio,
+  _formData: FormData
+): Promise<EstadoTestimonio> {
   await requireAdmin();
   const testimonio = await prisma.testimonio.delete({ where: { id } });
   await registrarAuditoria({ accion: "eliminar", entidad: "Testimonio", entidadId: id, detalle: testimonio.nombreCliente });
   revalidatePath("/admin/contenido/testimonios");
   revalidatePath("/");
+  return {};
 }

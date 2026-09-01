@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { marcarCompraPagada } from "./actions";
+import { useToastAccion } from "@/components/admin/ui/Toast";
 
 /**
  * Botón + mini-formulario para marcar como pagada una compra a crédito
@@ -15,6 +16,7 @@ export function MarcarCompraPagadaForm({ compraId }: { compraId: string }) {
     marcarCompraPagada.bind(null, compraId),
     {}
   );
+  useToastAccion(state, "Compra marcada como pagada.");
 
   if (!abierto) {
     return (
