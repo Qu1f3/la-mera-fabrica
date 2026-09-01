@@ -20,6 +20,7 @@ import { SITE_URL } from "@/lib/site";
 import {
   COLOR_ESTADO_PEDIDO,
   ETIQUETA_ESTADO_PEDIDO,
+  ETIQUETA_ESTADO_ENTREGA,
   type EstadoPedido,
   type EstadoEntrega,
 } from "@/lib/types";
