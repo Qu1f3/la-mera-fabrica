@@ -36,9 +36,10 @@ export async function crearCategoria(
   const slug = await generarSlugUnico(slugDeseado);
   const orden = Number(formData.get("orden"));
 
-  await prisma.categoria.create({
+  const categoria = await prisma.categoria.create({
     data: { nombre, slug, orden: Number.isFinite(orden) ? orden : 0 },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "Categoria", entidadId: categoria.id, detalle: categoria.nombre });
 
   revalidatePath("/admin/categorias");
   revalidatePath("/");
@@ -67,6 +68,7 @@ export async function actualizarCategoria(
       activo: formData.get("activo") === "on",
     },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Categoria", entidadId: id, detalle: nombre });
 
   revalidatePath("/admin/categorias");
   revalidatePath("/");

@@ -20,9 +20,10 @@ export async function crearFaq(
 
   const orden = Number(formData.get("orden"));
 
-  await prisma.faq.create({
+  const faq = await prisma.faq.create({
     data: { pregunta, respuesta, orden: Number.isFinite(orden) ? orden : 0 },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "Faq", entidadId: faq.id, detalle: faq.pregunta });
 
   revalidatePath("/admin/contenido/faq");
   revalidatePath("/preguntas-frecuentes");
@@ -52,6 +53,7 @@ export async function actualizarFaq(
       activo: formData.get("activo") === "on",
     },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Faq", entidadId: id, detalle: pregunta });
 
   revalidatePath("/admin/contenido/faq");
   revalidatePath("/preguntas-frecuentes");

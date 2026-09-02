@@ -4,14 +4,8 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { fechaDesdeInputHonduras } from "@/lib/fecha";
 import { registrarAuditoria } from "@/lib/auditoria";
-
-function fechaDesdeInput(valor: FormDataEntryValue | null): Date | null {
-  const texto = String(valor ?? "").trim();
-  if (!texto) return null;
-  const fecha = new Date(`${texto}T00:00:00`);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
-}
 
 export type MaterialFormState = { error?: string; ok?: boolean };
 
@@ -47,7 +41,7 @@ export async function crearMaterial(
   // material y otra al registrar la primera entrada). Empieza en null y se
   // sincroniza solo desde registrarMovimiento con el costo de la última
   // entrada, igual que cantidadActual solo cambia por movimiento.
-  await prisma.materialInventario.create({
+  const material = await prisma.materialInventario.create({
     data: {
       nombre,
       unidadMedida,
@@ -57,6 +51,7 @@ export async function crearMaterial(
       notas,
     },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "MaterialInventario", entidadId: material.id, detalle: material.nombre });
 
   // No redirige: el modal de "Nuevo material" se queda en /admin/inventario,
   // revalida la data y el formulario le avisa al usuario (ok:true) para
@@ -101,6 +96,7 @@ export async function actualizarMaterial(
       notas,
     },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "MaterialInventario", entidadId: id, detalle: nombre });
 
   revalidatePath("/admin/inventario");
   revalidatePath(`/admin/inventario/${id}`);
@@ -113,7 +109,13 @@ export async function alternarActivoMaterial(
   _formData: FormData
 ) {
   await requireAdmin();
-  await prisma.materialInventario.update({ where: { id }, data: { activo } });
+  const material = await prisma.materialInventario.update({ where: { id }, data: { activo } });
+  await registrarAuditoria({
+    accion: activo ? "activar" : "desactivar",
+    entidad: "MaterialInventario",
+    entidadId: id,
+    detalle: material.nombre,
+  });
   revalidatePath("/admin/inventario");
   revalidatePath(`/admin/inventario/${id}`);
 }
@@ -210,7 +212,7 @@ export async function registrarMovimiento(
 
   const deltaStock = tipo === "ENTRADA" ? cantidadEnUnidadBase : -cantidadEnUnidadBase;
 
-  await prisma.$transaction(async (tx) => {
+  const movimientoId = await prisma.$transaction(async (tx) => {
     let compraId: string | null = null;
     if (esCompra) {
       const compra = await tx.compra.create({
@@ -238,7 +240,7 @@ export async function registrarMovimiento(
       }
     }
 
-    await tx.movimientoInventario.create({
+    const movimiento = await tx.movimientoInventario.create({
       data: { materialId, tipo, cantidad, cantidadPorUnidad, costo, compraId, notas },
     });
 
@@ -252,6 +254,15 @@ export async function registrarMovimiento(
         ...(tipo === "ENTRADA" && costo !== null ? { costo } : {}),
       },
     });
+
+    return movimiento.id;
+  });
+
+  await registrarAuditoria({
+    accion: "crear",
+    entidad: "MovimientoInventario",
+    entidadId: movimientoId,
+    detalle: `${tipo} de ${material.nombre} (${cantidad}${esCompra ? `, compra L. ${montoTotal}` : ""})`,
   });
 
   // Mismo criterio que crearMaterial: sin redirect, para que el modal de
@@ -340,7 +351,7 @@ export async function marcarCompraPagada(
 ): Promise<MarcarCompraPagadaFormState> {
   await requireAdmin();
 
-  const fechaPago = fechaDesdeInput(formData.get("fechaPago")) ?? new Date();
+  const fechaPago = fechaDesdeInputHonduras(formData.get("fechaPago")) ?? new Date();
 
   const compra = await prisma.compra.findUnique({
     where: { id: compraId },
@@ -398,6 +409,7 @@ export async function crearProveedor(
   const proveedor = await prisma.proveedor.create({
     data: { nombre, telefono, notas },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "Proveedor", entidadId: proveedor.id, detalle: proveedor.nombre });
 
   revalidatePath("/admin/inventario/proveedores");
   redirect(`/admin/inventario/proveedores/${proveedor.id}`);
@@ -420,6 +432,7 @@ export async function actualizarProveedor(
     where: { id },
     data: { nombre, telefono, notas },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Proveedor", entidadId: id, detalle: nombre });
 
   revalidatePath("/admin/inventario/proveedores");
   revalidatePath(`/admin/inventario/proveedores/${id}`);
@@ -432,7 +445,13 @@ export async function alternarActivoProveedor(
   _formData: FormData
 ) {
   await requireAdmin();
-  await prisma.proveedor.update({ where: { id }, data: { activo } });
+  const proveedor = await prisma.proveedor.update({ where: { id }, data: { activo } });
+  await registrarAuditoria({
+    accion: activo ? "activar" : "desactivar",
+    entidad: "Proveedor",
+    entidadId: id,
+    detalle: proveedor.nombre,
+  });
   revalidatePath("/admin/inventario/proveedores");
   revalidatePath(`/admin/inventario/proveedores/${id}`);
 }

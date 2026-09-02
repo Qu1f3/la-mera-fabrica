@@ -109,6 +109,7 @@ export async function crearProducto(
   const slug = await generarSlugUnico(slugDeseado);
 
   const producto = await prisma.producto.create({ data: { ...datos, slug } });
+  await registrarAuditoria({ accion: "crear", entidad: "Producto", entidadId: producto.id, detalle: producto.nombre });
 
   revalidatePath("/admin/productos");
   revalidatePath("/");
@@ -130,6 +131,7 @@ export async function actualizarProducto(
   const slug = await generarSlugUnico(slugDeseado, id);
 
   await prisma.producto.update({ where: { id }, data: { ...datos, slug } });
+  await registrarAuditoria({ accion: "editar", entidad: "Producto", entidadId: id, detalle: datos.nombre });
 
   revalidatePath("/admin/productos");
   revalidatePath(`/admin/productos/${id}`);
@@ -185,6 +187,12 @@ export async function subirImagenesProducto(id: string, formData: FormData) {
     });
     orden += 1;
   }
+  await registrarAuditoria({
+    accion: "editar",
+    entidad: "Producto",
+    entidadId: id,
+    detalle: `${archivos.length} imagen(es) agregada(s)`,
+  });
 
   revalidatePath(`/admin/productos/${id}`);
   revalidatePath("/");
@@ -219,6 +227,7 @@ export async function borrarImagen(
   if (imagen) {
     await borrarImagenProducto(imagen.url);
     await prisma.imagenProducto.delete({ where: { id: imagenId } });
+    await registrarAuditoria({ accion: "editar", entidad: "Producto", entidadId: productoId, detalle: "imagen quitada" });
   }
 
   revalidatePath(`/admin/productos/${productoId}`);
@@ -241,6 +250,7 @@ export async function agregarRelacionado(productoId: string, formData: FormData)
     create: { productoId, relacionadoId, tipoRelacion },
     update: { tipoRelacion },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Producto", entidadId: productoId, detalle: `relacionado con producto ${relacionadoId}` });
 
   revalidatePath(`/admin/productos/${productoId}`);
   revalidatePath("/");
@@ -253,6 +263,7 @@ export async function quitarRelacionado(
 ) {
   await requireAdmin();
   await prisma.productoRelacionado.delete({ where: { id: relacionId } });
+  await registrarAuditoria({ accion: "editar", entidad: "Producto", entidadId: productoId, detalle: "relacionado quitado" });
   revalidatePath(`/admin/productos/${productoId}`);
   revalidatePath("/");
 }

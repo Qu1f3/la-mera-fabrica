@@ -45,6 +45,7 @@ const GRUPOS_NAV: Grupo[] = [
       { href: "/admin/inventario", label: "Inventario", icono: "📦" },
       { href: "/admin/finanzas", label: "Finanzas", icono: "💰" },
       { href: "/admin/reportes", label: "Reportes", icono: "📊" },
+      { href: "/admin/auditoria", label: "Auditoría", icono: "🔍" },
     ],
   },
   {

@@ -114,6 +114,28 @@ export function grillaMesHonduras(
   return celdas;
 }
 
+/**
+ * Convierte el valor de un <input type="date"> ("YYYY-MM-DD") al instante
+ * UTC que representa la medianoche de ESE día en Honduras (06:00 UTC).
+ *
+ * OJO: esto corre en server actions, es decir en el servidor (Vercel corre
+ * en UTC, no en hora de Honduras). `new Date(`${texto}T00:00:00`)` construye
+ * medianoche en la zona horaria de quien ejecuta el código -- en el
+ * navegador sería hora de Honduras (correcto), pero en el servidor es UTC
+ * (incorrecto: queda 6 horas adelantado, y al mostrarse de vuelta en hora
+ * de Honduras cae en el día anterior). Por eso hay que armar la fecha a
+ * mano con el offset fijo de Honduras en vez de dejar que `Date` asuma la
+ * zona horaria de donde corre el proceso.
+ */
+export function fechaDesdeInputHonduras(
+  valor: FormDataEntryValue | null | undefined
+): Date | null {
+  const texto = String(valor ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return null;
+  const fecha = new Date(`${texto}T06:00:00.000Z`);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
 /** "YYYY-MM" del mes anterior/siguiente a partir de "YYYY-MM". */
 export function mesAdyacente(mesTexto: string, delta: 1 | -1): string {
   const [anioStr, mesStr] = mesTexto.split("-");

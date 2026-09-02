@@ -6,21 +6,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { fechaDesdeInputHonduras } from "@/lib/fecha";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { generarCodigoPedido } from "@/lib/pedidoCodigo";
 import { calcularSubtotal, calcularTotalesPedido } from "@/lib/pedidoTotales";
 import type { EstadoPedido, EstadoEntrega, ItemPedidoFormulario } from "@/lib/types";
 
 export type PedidoFormState = { error?: string };
-
-function fechaDesdeInput(valor: FormDataEntryValue | null): Date | null {
-  const texto = String(valor ?? "").trim();
-  if (!texto) return null;
-  // Los <input type="date"> mandan "YYYY-MM-DD" -- se arma a medianoche
-  // local para no depender de a qué hora corre el servidor.
-  const fecha = new Date(`${texto}T00:00:00`);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
-}
 
 function parsearItems(valor: FormDataEntryValue | null): ItemPedidoFormulario[] | null {
   try {
@@ -90,7 +82,7 @@ export async function crearPedido(
     entradaAnticipo = { modo: "PORCENTAJE", porcentaje: porcentajeAnticipo };
   }
 
-  const fechaPrometida = fechaDesdeInput(formData.get("fechaPrometida"));
+  const fechaPrometida = fechaDesdeInputHonduras(formData.get("fechaPrometida"));
   const notas = String(formData.get("notas") || "").trim() || null;
 
   const adminUsuario = await obtenerAdminUsuario(user);
@@ -143,6 +135,7 @@ export async function crearPedido(
 
     return nuevo;
   });
+  await registrarAuditoria({ accion: "crear", entidad: "Pedido", entidadId: pedido.id, detalle: codigo });
 
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/clientes/${clienteId}`);
@@ -221,10 +214,11 @@ export async function asignarFechaPrometida(
   formData: FormData
 ): Promise<PedidoFormState> {
   await requireAdmin();
-  const fechaPrometida = fechaDesdeInput(formData.get("fechaPrometida"));
+  const fechaPrometida = fechaDesdeInputHonduras(formData.get("fechaPrometida"));
   if (!fechaPrometida) return { error: "La fecha no es válida." };
 
   await prisma.pedido.update({ where: { id: pedidoId }, data: { fechaPrometida } });
+  await registrarAuditoria({ accion: "editar", entidad: "Pedido", entidadId: pedidoId, detalle: "fecha prometida" });
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/pedidos");
   return {};
@@ -239,9 +233,10 @@ export async function registrarRiego(
   const adminUsuario = await obtenerAdminUsuario(user);
   const observacion = String(formData.get("observacion") || "").trim() || null;
 
-  await prisma.registroRiego.create({
+  const riego = await prisma.registroRiego.create({
     data: { pedidoId, adminUsuarioId: adminUsuario.id, observacion },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "RegistroRiego", entidadId: riego.id, detalle: observacion ?? undefined });
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   return {};
@@ -258,10 +253,11 @@ export async function crearEntrega(
   formData: FormData
 ): Promise<PedidoFormState> {
   await requireAdmin();
-  const fechaProgramada = fechaDesdeInput(formData.get("fechaProgramada"));
+  const fechaProgramada = fechaDesdeInputHonduras(formData.get("fechaProgramada"));
   const notas = String(formData.get("notas") || "").trim() || null;
 
-  await prisma.entrega.create({ data: { pedidoId, fechaProgramada, notas } });
+  const entrega = await prisma.entrega.create({ data: { pedidoId, fechaProgramada, notas } });
+  await registrarAuditoria({ accion: "crear", entidad: "Entrega", entidadId: entrega.id, detalle: pedidoId });
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/calendario");
@@ -292,6 +288,8 @@ export async function actualizarEstadoEntrega(
         estado === "ENTREGADO" && !entregaActual.fechaReal ? new Date() : undefined,
     },
   });
+
+  await registrarAuditoria({ accion: "cambiar_estado", entidad: "Entrega", entidadId: entregaId, detalle: estado });
 
   revalidatePath(`/admin/pedidos/${entregaActual.pedidoId}`);
   revalidatePath("/admin/calendario");

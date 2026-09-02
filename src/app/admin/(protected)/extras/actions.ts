@@ -29,7 +29,8 @@ export async function crearTipoPagoExtra(
     return { error: "El monto sugerido no es válido." };
   }
 
-  await prisma.tipoPagoExtra.create({ data: { descripcion, montoSugerido, signo } });
+  const tipo = await prisma.tipoPagoExtra.create({ data: { descripcion, montoSugerido, signo } });
+  await registrarAuditoria({ accion: "crear", entidad: "TipoPagoExtra", entidadId: tipo.id, detalle: tipo.descripcion });
   revalidatePath("/admin/extras");
   return {};
 }
@@ -40,7 +41,13 @@ export async function alternarActivoTipoPagoExtra(
   _formData: FormData
 ) {
   await requireAdmin();
-  await prisma.tipoPagoExtra.update({ where: { id }, data: { activo } });
+  const tipo = await prisma.tipoPagoExtra.update({ where: { id }, data: { activo } });
+  await registrarAuditoria({
+    accion: activo ? "activar" : "desactivar",
+    entidad: "TipoPagoExtra",
+    entidadId: id,
+    detalle: tipo.descripcion,
+  });
   revalidatePath("/admin/extras");
 }
 
@@ -83,8 +90,14 @@ export async function registrarPagoExtra(
     if (tipo?.signo === "RESTA") monto = -montoIngresado;
   }
 
-  await prisma.pagoExtraEmpleado.create({
+  const pago = await prisma.pagoExtraEmpleado.create({
     data: { empleadoId, tipoPagoExtraId, descripcion, monto, notas },
+  });
+  await registrarAuditoria({
+    accion: "crear",
+    entidad: "PagoExtraEmpleado",
+    entidadId: pago.id,
+    detalle: `${descripcion} (L. ${monto})`,
   });
 
   revalidatePath("/admin/extras");

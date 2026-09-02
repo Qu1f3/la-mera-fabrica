@@ -26,7 +26,7 @@ export async function crearTestimonio(
     return { error: "El nombre del cliente y el testimonio son obligatorios." };
   }
 
-  await prisma.testimonio.create({
+  const testimonio = await prisma.testimonio.create({
     data: {
       nombreCliente,
       texto,
@@ -34,6 +34,7 @@ export async function crearTestimonio(
       fotoUrl: String(formData.get("fotoUrl") || "").trim() || null,
     },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "Testimonio", entidadId: testimonio.id, detalle: testimonio.nombreCliente });
 
   revalidatePath("/admin/contenido/testimonios");
   revalidatePath("/");
@@ -62,6 +63,7 @@ export async function actualizarTestimonio(
       activo: formData.get("activo") === "on",
     },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Testimonio", entidadId: id, detalle: nombreCliente });
 
   revalidatePath("/admin/contenido/testimonios");
   revalidatePath("/");

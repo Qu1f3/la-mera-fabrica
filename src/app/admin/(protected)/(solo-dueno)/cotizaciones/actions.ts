@@ -21,6 +21,7 @@ export async function actualizarEstadoCotizacion(
     where: { id },
     data: { estado },
   });
+  await registrarAuditoria({ accion: "cambiar_estado", entidad: "SolicitudCotizacion", entidadId: id, detalle: estado });
 
   revalidatePath("/admin/cotizaciones");
   revalidatePath(`/admin/cotizaciones/${id}`);

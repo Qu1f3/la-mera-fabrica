@@ -43,6 +43,7 @@ export async function crearBanner(
   if (!datos.titulo) return { error: "El título es obligatorio." };
 
   const banner = await prisma.banner.create({ data: datos });
+  await registrarAuditoria({ accion: "crear", entidad: "Banner", entidadId: banner.id, detalle: banner.titulo });
 
   revalidatePath("/admin/contenido/banners");
   revalidatePath("/");
@@ -59,6 +60,7 @@ export async function actualizarBanner(
   if (!datos.titulo) return { error: "El título es obligatorio." };
 
   await prisma.banner.update({ where: { id }, data: datos });
+  await registrarAuditoria({ accion: "editar", entidad: "Banner", entidadId: id, detalle: datos.titulo });
 
   revalidatePath("/admin/contenido/banners");
   revalidatePath(`/admin/contenido/banners/${id}`);
@@ -86,6 +88,7 @@ export async function subirImagenBanner(id: string, formData: FormData) {
     where: { id },
     data: { imagenUrl: subida.url },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Banner", entidadId: id, detalle: "imagen actualizada" });
 
   revalidatePath(`/admin/contenido/banners/${id}`);
   revalidatePath("/");
@@ -105,6 +108,7 @@ export async function borrarImagenBanner(
 
   await borrarImagenContenido(banner.imagenUrl);
   await prisma.banner.update({ where: { id }, data: { imagenUrl: null } });
+  await registrarAuditoria({ accion: "editar", entidad: "Banner", entidadId: id, detalle: "imagen quitada" });
 
   revalidatePath(`/admin/contenido/banners/${id}`);
   revalidatePath("/");

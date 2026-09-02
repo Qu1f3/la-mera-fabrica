@@ -3,16 +3,10 @@
 import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { fechaDesdeInputHonduras } from "@/lib/fecha";
 import { registrarAuditoria } from "@/lib/auditoria";
 
 export type PagoSemanalFormState = { error?: string };
-
-function fechaDesdeInput(valor: FormDataEntryValue | null): Date | null {
-  const texto = String(valor ?? "").trim();
-  if (!texto) return null;
-  const fecha = new Date(`${texto}T00:00:00`);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
-}
 
 /**
  * Genera (o regenera) el pago semanal de un empleado sumando sus registros
@@ -29,8 +23,8 @@ export async function generarPagoSemanal(
   await requireAdmin();
 
   const empleadoId = String(formData.get("empleadoId") || "").trim();
-  const semanaInicio = fechaDesdeInput(formData.get("semanaInicio"));
-  const semanaFin = fechaDesdeInput(formData.get("semanaFin"));
+  const semanaInicio = fechaDesdeInputHonduras(formData.get("semanaInicio"));
+  const semanaFin = fechaDesdeInputHonduras(formData.get("semanaFin"));
 
   if (!empleadoId) return { error: "Selecciona un empleado." };
   if (!semanaInicio || !semanaFin) {
@@ -66,7 +60,7 @@ export async function generarPagoSemanal(
   const totalGanado =
     Math.round((totalProduccion + totalMezcla + totalExtras) * 100) / 100;
 
-  await prisma.pagoEmpleado.upsert({
+  const pago = await prisma.pagoEmpleado.upsert({
     where: { empleadoId_semanaInicio: { empleadoId, semanaInicio } },
     create: {
       empleadoId,
@@ -85,6 +79,12 @@ export async function generarPagoSemanal(
       totalGanado,
     },
   });
+  await registrarAuditoria({
+    accion: "generar",
+    entidad: "PagoEmpleado",
+    entidadId: pago.id,
+    detalle: `L. ${totalGanado}`,
+  });
 
   revalidatePath("/admin/pagos-semanales");
   return {};
@@ -100,7 +100,7 @@ export async function marcarPagoSemanalPagado(
   await requireAdmin();
 
   const montoPagado = Number(formData.get("montoPagado"));
-  const fechaPago = fechaDesdeInput(formData.get("fechaPago")) ?? new Date();
+  const fechaPago = fechaDesdeInputHonduras(formData.get("fechaPago")) ?? new Date();
 
   if (!Number.isFinite(montoPagado) || montoPagado < 0) {
     return { error: "El monto pagado no es válido." };

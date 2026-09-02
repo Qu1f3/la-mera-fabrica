@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 export type EstadoConfiguracion = { error?: string };
 
@@ -37,6 +38,8 @@ export async function actualizarConfiguracion(
     },
   });
 
+  await registrarAuditoria({ accion: "editar", entidad: "Configuracion", entidadId: "global" });
+
   // El número de WhatsApp y demás datos de contacto se usan en todo el
   // sitio público (botones de producto, footer, etc.), así que se invalida
   // todo en vez de una sola ruta.
@@ -61,6 +64,7 @@ export async function actualizarPlantilla(
   if (!cuerpo) return { error: "El mensaje no puede quedar vacío." };
 
   await prisma.plantillaMensaje.update({ where: { clave }, data: { cuerpo } });
+  await registrarAuditoria({ accion: "editar", entidad: "PlantillaMensaje", entidadId: clave });
 
   revalidatePath("/admin/configuracion");
   // "layout" porque el mensaje se usa en /admin/pedidos/[id], una ruta

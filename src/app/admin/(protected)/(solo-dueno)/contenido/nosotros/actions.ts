@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { subirImagenContenido, borrarImagenContenido } from "@/lib/storage";
+import { registrarAuditoria } from "@/lib/auditoria";
 
 const CLAVE = "nosotros";
 
@@ -22,6 +23,7 @@ export async function actualizarNosotros(
     create: { clave: CLAVE, titulo, cuerpo },
     update: { titulo, cuerpo },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "SeccionContenido", entidadId: CLAVE, detalle: titulo });
 
   revalidatePath("/admin/contenido/nosotros");
   revalidatePath("/nosotros");
@@ -49,6 +51,7 @@ export async function subirImagenNosotros(formData: FormData) {
     create: { clave: CLAVE, titulo: "Nosotros", imagenUrl: subida.url },
     update: { imagenUrl: subida.url },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "SeccionContenido", entidadId: CLAVE, detalle: "imagen actualizada" });
 
   revalidatePath("/admin/contenido/nosotros");
   revalidatePath("/nosotros");
@@ -70,6 +73,7 @@ export async function borrarImagenNosotros(
     where: { clave: CLAVE },
     data: { imagenUrl: null },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "SeccionContenido", entidadId: CLAVE, detalle: "imagen quitada" });
 
   revalidatePath("/admin/contenido/nosotros");
   revalidatePath("/nosotros");

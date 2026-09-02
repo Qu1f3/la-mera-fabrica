@@ -4,16 +4,10 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { fechaDesdeInputHonduras } from "@/lib/fecha";
 import { registrarAuditoria } from "@/lib/auditoria";
 
 export type EmpleadoFormState = { error?: string };
-
-function fechaDesdeInput(valor: FormDataEntryValue | null): Date | null {
-  const texto = String(valor ?? "").trim();
-  if (!texto) return null;
-  const fecha = new Date(`${texto}T00:00:00`);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
-}
 
 export async function crearEmpleado(
   _prevState: EmpleadoFormState,
@@ -23,13 +17,14 @@ export async function crearEmpleado(
   const nombre = String(formData.get("nombre") || "").trim();
   const telefono = String(formData.get("telefono") || "").trim() || null;
   const notas = String(formData.get("notas") || "").trim() || null;
-  const fechaIngreso = fechaDesdeInput(formData.get("fechaIngreso"));
+  const fechaIngreso = fechaDesdeInputHonduras(formData.get("fechaIngreso"));
 
   if (!nombre) return { error: "El nombre es obligatorio." };
 
   const empleado = await prisma.empleado.create({
     data: { nombre, telefono, notas, fechaIngreso },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "Empleado", entidadId: empleado.id, detalle: empleado.nombre });
 
   revalidatePath("/admin/empleados");
   redirect(`/admin/empleados/${empleado.id}`);
@@ -44,7 +39,7 @@ export async function actualizarEmpleado(
   const nombre = String(formData.get("nombre") || "").trim();
   const telefono = String(formData.get("telefono") || "").trim() || null;
   const notas = String(formData.get("notas") || "").trim() || null;
-  const fechaIngreso = fechaDesdeInput(formData.get("fechaIngreso"));
+  const fechaIngreso = fechaDesdeInputHonduras(formData.get("fechaIngreso"));
 
   if (!nombre) return { error: "El nombre es obligatorio." };
 
@@ -52,6 +47,7 @@ export async function actualizarEmpleado(
     where: { id },
     data: { nombre, telefono, notas, fechaIngreso },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Empleado", entidadId: id, detalle: nombre });
 
   revalidatePath("/admin/empleados");
   revalidatePath(`/admin/empleados/${id}`);
@@ -64,7 +60,13 @@ export async function alternarActivoEmpleado(
   _formData: FormData
 ) {
   await requireAdmin();
-  await prisma.empleado.update({ where: { id }, data: { activo } });
+  const empleado = await prisma.empleado.update({ where: { id }, data: { activo } });
+  await registrarAuditoria({
+    accion: activo ? "activar" : "desactivar",
+    entidad: "Empleado",
+    entidadId: id,
+    detalle: empleado.nombre,
+  });
   revalidatePath("/admin/empleados");
   revalidatePath(`/admin/empleados/${id}`);
 }

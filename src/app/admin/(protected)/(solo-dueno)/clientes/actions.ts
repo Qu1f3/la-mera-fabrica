@@ -31,6 +31,7 @@ export async function crearCliente(
   const cliente = await prisma.cliente.create({
     data: { nombre, telefono, notas },
   });
+  await registrarAuditoria({ accion: "crear", entidad: "Cliente", entidadId: cliente.id, detalle: cliente.nombre });
 
   revalidatePath("/admin/clientes");
   redirect(`/admin/clientes/${cliente.id}`);
@@ -53,6 +54,7 @@ export async function actualizarCliente(
     where: { id },
     data: { nombre, telefono, notas },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "Cliente", entidadId: id, detalle: nombre });
 
   revalidatePath("/admin/clientes");
   revalidatePath(`/admin/clientes/${id}`);
@@ -102,6 +104,7 @@ export async function crearClienteInline(
   if (!telefono) return { error: "El teléfono es obligatorio." };
 
   const cliente = await prisma.cliente.create({ data: { nombre, telefono } });
+  await registrarAuditoria({ accion: "crear", entidad: "Cliente", entidadId: cliente.id, detalle: cliente.nombre });
   revalidatePath("/admin/clientes");
 
   return {

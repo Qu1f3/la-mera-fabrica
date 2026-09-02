@@ -79,9 +79,12 @@ export async function registrarProduccion(
     return { error: "El monto de mezcla no es válido." };
   }
 
-  await prisma.$transaction(async (tx) => {
+  const { registroId, mezclaId } = await prisma.$transaction(async (tx) => {
+    let registroId: string | null = null;
+    let mezclaId: string | null = null;
+
     if (registraProduccion) {
-      await tx.registroProduccion.create({
+      const registro = await tx.registroProduccion.create({
         data: {
           empleadoId,
           productoId,
@@ -92,13 +95,38 @@ export async function registrarProduccion(
           notas,
         },
       });
+      registroId = registro.id;
     }
     if (hizoMezcla) {
-      await tx.registroMezcla.create({
+      const mezcla = await tx.registroMezcla.create({
         data: { empleadoId, monto: montoMezcla, notas },
       });
+      mezclaId = mezcla.id;
     }
+
+    return { registroId, mezclaId };
   });
+
+  // Los llamados a registrarAuditoria van DESPUES de que la transaccion ya
+  // confirmo -- adentro usaria el cliente global de prisma (no `tx`) y
+  // ademas llama a Supabase auth por red, lo que dejaria la transaccion
+  // interactiva abierta de mas y podria toparse con su timeout.
+  if (registroId) {
+    await registrarAuditoria({
+      accion: "crear",
+      entidad: "RegistroProduccion",
+      entidadId: registroId,
+      detalle: `${cantidadProducida} unidad(es) -- L. ${totalGanado}`,
+    });
+  }
+  if (mezclaId) {
+    await registrarAuditoria({
+      accion: "crear",
+      entidad: "RegistroMezcla",
+      entidadId: mezclaId,
+      detalle: `L. ${montoMezcla}`,
+    });
+  }
 
   revalidatePath("/admin/produccion");
   redirect("/admin/produccion");
@@ -154,6 +182,7 @@ export async function guardarPagoUnitario(
     create: { productoId, monto },
     update: { monto },
   });
+  await registrarAuditoria({ accion: "editar", entidad: "PagoUnitarioProducto", entidadId: productoId, detalle: `L. ${monto}` });
 
   revalidatePath("/admin/produccion/pago-unitario");
   revalidatePath("/admin/produccion");
