@@ -40,6 +40,10 @@ export default async function PagosSemanalesPage() {
           Generar pago semanal
         </h2>
         <NuevoPagoSemanalForm empleados={empleados} />
+        <p className="mt-2 text-xs text-neutral-400">
+          Si un día de este rango ya se pagó por separado (ej: un adelanto de un solo día), ese
+          monto se resta solo y queda una nota de &quot;Ya pagado&quot; junto al total.
+        </p>
       </div>
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-neutral-200 bg-white">
@@ -81,6 +85,14 @@ export default async function PagosSemanalesPage() {
                 </td>
                 <td className="px-4 py-3 font-semibold text-neutral-900">
                   L. {pago.totalGanado.toString()}
+                  {/* Nota automática de generarPagoSemanal (ver actions.ts) --
+                      explica por qué el total no es la suma "cruda" del rango
+                      cuando algún día ya se pagó en otro registro. */}
+                  {pago.notas && (
+                    <span className="mt-1 block text-xs font-normal text-amber-600">
+                      {pago.notas}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span

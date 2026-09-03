@@ -105,6 +105,11 @@ model Producto {
   itemsPedido         ItemPedido[]
   pagoUnitario        PagoUnitarioProducto?
   registrosProduccion RegistroProduccion[]
+  // Receta de mezcla (cemento + colorante) para hacer este mosaico -- ver
+  // Fase "Combinaciones" del sistema de gestion. Solo aplica a MOSAICO en la
+  // practica (la UI solo deja elegir productos de ese tipo al crear una),
+  // pero no se restringe a nivel de schema.
+  combinacionMosaico  CombinacionMosaico?
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -780,4 +785,49 @@ model RegistroAuditoria {
   @@index([entidad, entidadId])
   @@index([creadoEn])
   @@map("registros_auditoria")
+}
+
+// ---------------------------------------------------------------------------
+// Sistema de gestion -- Combinaciones de mezcla (recetas de mosaico)
+// ---------------------------------------------------------------------------
+// Catalogo de referencia para saber cuanto cemento + colorante lleva cada
+// mosaico (ej: "Espiral rojo con pringa negra" = Fondo Rojo (cemento gris
+// 42.5kg + colorante rojo 6lb) + Pringa Negra (cemento gris 16lb +
+// colorante negro 1lb)) -- pedido por el usuario 2026-09-03. Es solo
+// informativo: NO descuenta inventario ni se referencia desde
+// RegistroProduccion, a diferencia de MaterialInventario/MovimientoInventario
+// que si llevan el stock real.
+
+model CombinacionMosaico {
+  id            String                  @id @default(cuid())
+  productoId    String                  @unique
+  producto      Producto                @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  notas         String?
+  componentes   ComponenteCombinacion[]
+  creadoEn      DateTime                @default(now())
+  actualizadoEn DateTime                @updatedAt
+
+  @@map("combinaciones_mosaico")
+}
+
+// Una "capa" o parte de la combinacion (ej: "Fondo Rojo", "Pringa Negra",
+// "Blanco"). cementoCantidad/coloranteCantidad quedan en null cuando no hay
+// una cantidad exacta (ej: el cemento base ya es del color de fondo, o "depende
+// del empleado") -- en ese caso `notas` explica el motivo en vez de forzar un
+// numero inventado.
+model ComponenteCombinacion {
+  id                String             @id @default(cuid())
+  combinacionId     String
+  combinacion       CombinacionMosaico @relation(fields: [combinacionId], references: [id], onDelete: Cascade)
+  orden             Int                @default(0)
+  nombre            String
+  cementoCantidad   Decimal?           @db.Decimal(10, 2)
+  cementoUnidad     String?
+  coloranteColor    String?
+  coloranteCantidad Decimal?           @db.Decimal(10, 2)
+  coloranteUnidad   String?
+  notas             String?
+
+  @@index([combinacionId])
+  @@map("componentes_combinacion")
 }

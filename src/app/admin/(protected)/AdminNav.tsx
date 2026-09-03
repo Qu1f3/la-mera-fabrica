@@ -19,6 +19,7 @@ type Grupo = { titulo: string; enlaces: Enlace[] };
 const RUTAS_EMPLEADO = [
   "/admin/pedidos",
   "/admin/produccion",
+  "/admin/combinaciones",
   "/admin/extras",
   "/admin/pagos-semanales",
   "/admin/inventario",
@@ -39,6 +40,7 @@ const GRUPOS_NAV: Grupo[] = [
     titulo: "Operación",
     enlaces: [
       { href: "/admin/produccion", label: "Producción", icono: "🏭" },
+      { href: "/admin/combinaciones", label: "Combinaciones", icono: "🎨" },
       { href: "/admin/extras", label: "Extras", icono: "➕" },
       { href: "/admin/empleados", label: "Empleados", icono: "👷" },
       { href: "/admin/pagos-semanales", label: "Pagos semanales", icono: "💵" },
