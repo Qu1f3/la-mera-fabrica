@@ -1,18 +1,41 @@
 "use client";
 
-import { useActionState } from "react";
-import { useToastAccion } from "@/components/admin/ui/Toast";
-import { crearEntrega } from "../actions";
+import { useRef, useState, type FormEvent } from "react";
+import { useToast } from "@/components/admin/ui/Toast";
+import { encolarEntrega, generarIdLocal } from "@/lib/offline/sync";
 
 export function CrearEntregaForm({ pedidoId }: { pedidoId: string }) {
-  const [state, formAction] = useActionState(
-    crearEntrega.bind(null, pedidoId),
-    {}
-  );
-  useToastAccion(state, "Entrega programada.");
+  const { mostrarToast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function alEnviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setError(null);
+    const formData = new FormData(evento.currentTarget);
+    const fechaProgramadaInput = String(formData.get("fechaProgramada") || "");
+    const notas = String(formData.get("notas") || "").trim() || null;
+
+    setPending(true);
+    try {
+      await encolarEntrega({
+        pedidoId,
+        fechaProgramadaInput,
+        notas,
+        idEntrega: generarIdLocal(),
+      });
+      mostrarToast("Entrega programada.");
+      formRef.current?.reset();
+    } catch {
+      setError("No se pudo guardar en este dispositivo. Intenta de nuevo.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-2">
+    <form ref={formRef} onSubmit={alEnviar} className="flex flex-wrap items-end gap-2">
       <label className="text-sm text-neutral-700">
         Fecha programada (opcional)
         <input
@@ -28,10 +51,12 @@ export function CrearEntregaForm({ pedidoId }: { pedidoId: string }) {
       />
       <button
         type="submit"
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+        disabled={pending}
+        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
       >
-        Programar entrega
+        {pending ? "Guardando…" : "Programar entrega"}
       </button>
+      {error && <p className="w-full text-sm text-red-600">{error}</p>}
     </form>
   );
 }

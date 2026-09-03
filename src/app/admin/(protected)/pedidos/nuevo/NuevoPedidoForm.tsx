@@ -1,12 +1,12 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { crearPedido } from "../actions";
-import { crearClienteInline } from "../../(solo-dueno)/clientes/actions";
-import { useToastAccion } from "@/components/admin/ui/Toast";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useToast } from "@/components/admin/ui/Toast";
 import { calcularSubtotal, calcularTotalesPedido, type EntradaAnticipo } from "@/lib/pedidoTotales";
 import { Combobox } from "@/components/admin/ui/Combobox";
 import { claveDiaHonduras } from "@/lib/fecha";
+import { encolarPedido, generarIdLocal } from "@/lib/offline/sync";
+import { generarCodigoPedidoCliente } from "@/lib/pedidoCodigoCliente";
 
 type ClienteOpcion = { id: string; nombre: string; telefono: string };
 type ProductoOpcion = {
@@ -41,6 +41,21 @@ function nuevaFila(): FilaItem {
   };
 }
 
+/**
+ * Antes este formulario eran dos Server Actions encadenadas
+ * (crearClienteInline y luego crearPedido, cada una un viaje aparte al
+ * servidor) y, al terminar bien, redirigía a /admin/pedidos/[id]. Desde la
+ * Fase 4 de "modo sin conexión" (ver propuesta-modo-offline.md), todo --
+ * crear el cliente si hace falta, y crear el pedido -- se manda junto en
+ * una sola llamada a encolarPedido(), que funciona igual con o sin señal
+ * (ver src/lib/pedidos/crear.ts, que hace las dos cosas en una misma
+ * transacción). Solo se navega al detalle si el pedido de verdad quedó
+ * guardado en el servidor al momento de enviarlo -- si quedó pendiente
+ * (sin conexión, o el servidor lo rechazó), el formulario se queda en la
+ * página y se limpia, igual que Producción/Extras/Inventario, porque la
+ * página de detalle de un pedido que todavía no existe del otro lado no
+ * puede cargar.
+ */
 export function NuevoPedidoForm({
   clientesIniciales,
   productos,
@@ -50,17 +65,15 @@ export function NuevoPedidoForm({
   productos: ProductoOpcion[];
   clienteIdInicial: string;
 }) {
-  const [clientes, setClientes] = useState(clientesIniciales);
+  const { mostrarToast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [clientes] = useState(clientesIniciales);
   const [clienteId, setClienteId] = useState(clienteIdInicial);
-  // Sigue el último cliente creado inline que ya se aplicó al formulario --
-  // evita repetir el efecto secundario si el componente vuelve a renderizar
-  // sin que estadoCliente.cliente haya cambiado de verdad.
-  const [ultimoClienteInlineId, setUltimoClienteInlineId] = useState<string | null>(
-    null
-  );
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(
     clientesIniciales.length === 0
   );
+  const [nombreClienteNuevo, setNombreClienteNuevo] = useState("");
+  const [telefonoClienteNuevo, setTelefonoClienteNuevo] = useState("");
   const [items, setItems] = useState<FilaItem[]>([nuevaFila()]);
   const [modoAnticipo, setModoAnticipo] = useState<"PORCENTAJE" | "MONTO_FIJO">(
     "PORCENTAJE"
@@ -75,32 +88,8 @@ export function NuevoPedidoForm({
     claveDiaHonduras(new Date())
   );
   const [notas, setNotas] = useState("");
-
-  const [estadoCliente, formActionCliente, guardandoCliente] = useActionState(
-    crearClienteInline,
-    {}
-  );
-  useToastAccion(estadoCliente, "Cliente agregado.");
-  const [estadoPedido, formActionPedido, guardandoPedido] = useActionState(
-    crearPedido,
-    {}
-  );
-  useToastAccion(estadoPedido, "Pedido creado.");
-
-  // Patrón recomendado por React para "ajustar estado cuando cambia una
-  // prop/valor derivado" -- se llama a setState durante el render (no
-  // dentro de un useEffect) y se evita el bucle infinito comparando contra
-  // el último id ya aplicado. Ver
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  if (
-    estadoCliente.cliente &&
-    estadoCliente.cliente.id !== ultimoClienteInlineId
-  ) {
-    setUltimoClienteInlineId(estadoCliente.cliente.id);
-    setClientes((actuales) => [estadoCliente.cliente!, ...actuales]);
-    setClienteId(estadoCliente.cliente.id);
-    setMostrarNuevoCliente(false);
-  }
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   function actualizarFila(key: string, cambios: Partial<FilaItem>) {
     setItems((actuales) =>
@@ -127,7 +116,8 @@ export function NuevoPedidoForm({
       productos.map((p) => ({
         id: p.id,
         etiqueta: p.sku ? `${p.nombre} (${p.sku})` : p.nombre,
-        subtexto: [p.tipo, p.categoria, p.diseno].filter(Boolean).join(" · ") +
+        subtexto:
+          [p.tipo, p.categoria, p.diseno].filter(Boolean).join(" · ") +
           ` — L. ${p.precioActual}`,
         imagenUrl: p.imagenUrl,
       })),
@@ -152,7 +142,6 @@ export function NuevoPedidoForm({
           const producto = productos.find((p) => p.id === fila.productoId);
           return {
             productoId: fila.productoId,
-            nombre: producto?.nombre ?? "",
             categoria: producto?.categoria ?? null,
             diseno: producto?.diseno ?? null,
             color: fila.color.trim() || null,
@@ -168,10 +157,111 @@ export function NuevoPedidoForm({
       ? { modo: "MONTO_FIJO", monto: Number(montoAnticipoFijo) || 0 }
       : { modo: "PORCENTAJE", porcentaje: Number(porcentajeAnticipo) || 0 };
   const totales = calcularTotalesPedido(itemsValidos, entradaAnticipo);
-  const itemsJson = JSON.stringify(itemsValidos);
+
+  const clienteListo = mostrarNuevoCliente
+    ? nombreClienteNuevo.trim() !== "" && telefonoClienteNuevo.trim() !== ""
+    : clienteId !== "";
+
+  async function alEnviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setError(null);
+
+    if (!clienteListo) {
+      setError("Selecciona o crea un cliente.");
+      return;
+    }
+    if (itemsValidos.length === 0) {
+      setError("Agrega al menos un producto con cantidad y precio válidos.");
+      return;
+    }
+    // Mismas validaciones que hace registrarPedidoCompartido -- ver
+    // src/lib/pedidos/crear.ts -- se repiten acá para avisar al instante en
+    // vez de que la persona se entere hasta que el servidor lo rechace
+    // (posiblemente horas después, si se guardó sin conexión).
+    if (modoAnticipo === "MONTO_FIJO") {
+      const monto = Number(montoAnticipoFijo);
+      const totalItems = itemsValidos.reduce(
+        (suma, item) => suma + item.cantidad * item.precioUnitario,
+        0
+      );
+      if (!Number.isFinite(monto) || monto < 0) {
+        setError("El monto de anticipo no es válido.");
+        return;
+      }
+      if (monto > totalItems) {
+        setError("El anticipo no puede ser mayor que el total del pedido.");
+        return;
+      }
+    } else {
+      const porcentaje = Number(porcentajeAnticipo);
+      if (!Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+        setError("El porcentaje de anticipo debe estar entre 0 y 100.");
+        return;
+      }
+    }
+
+    setPending(true);
+    try {
+      const idPedido = generarIdLocal();
+      const { pedidoId, sincronizado } = await encolarPedido({
+        idPedido,
+        codigo: generarCodigoPedidoCliente(),
+        clienteId: mostrarNuevoCliente ? undefined : clienteId,
+        clienteNuevo: mostrarNuevoCliente
+          ? {
+              id: generarIdLocal(),
+              nombre: nombreClienteNuevo.trim(),
+              telefono: telefonoClienteNuevo.trim(),
+            }
+          : undefined,
+        items: itemsValidos,
+        modoAnticipo,
+        porcentajeAnticipo: Number(porcentajeAnticipo) || 0,
+        montoAnticipoFijo: Number(montoAnticipoFijo) || 0,
+        fechaPrometidaInput: fechaPrometida,
+        notas: notas.trim() || null,
+        idIngreso: generarIdLocal(),
+      });
+
+      if (sincronizado) {
+        mostrarToast("Pedido creado.");
+        // Navegación dura (no router de Next) para que el service worker
+        // la intercepte igual que cualquier otra ruta sin conexión -- ver
+        // AdminNav.tsx y propuesta-modo-offline.md.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a propósito, ver comentario arriba
+        window.location.href = `/admin/pedidos/${pedidoId}`;
+        return;
+      }
+
+      mostrarToast(
+        "Pedido guardado en este dispositivo -- se sincroniza solo al volver la señal."
+      );
+      formRef.current?.reset();
+      setItems([nuevaFila()]);
+      setNotas("");
+      setPorcentajeAnticipo("60");
+      setMontoAnticipoFijo("");
+      setFechaPrometida(claveDiaHonduras(new Date()));
+      setNombreClienteNuevo("");
+      setTelefonoClienteNuevo("");
+      if (mostrarNuevoCliente) {
+        // El cliente que se acaba de escribir quedó sin conexión, en cola
+        // -- no aparece todavía en la lista de clientes existentes de este
+        // formulario (necesitaría volver a cargar la página con señal),
+        // así que se deja el modo "nuevo cliente" listo para el siguiente
+        // pedido en vez de dejar seleccionado un cliente que en este
+        // dispositivo todavía no existe de verdad.
+        setClienteId("");
+      }
+    } catch {
+      setError("No se pudo guardar en este dispositivo. Intenta de nuevo.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
-    <div className="space-y-6">
+    <form ref={formRef} onSubmit={alEnviar} className="space-y-6">
       <section className="rounded-lg border border-neutral-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-neutral-900">Cliente</h2>
         {!mostrarNuevoCliente ? (
@@ -195,35 +285,37 @@ export function NuevoPedidoForm({
             </button>
           </div>
         ) : (
-          <form action={formActionCliente} className="mt-3 flex flex-wrap items-end gap-3">
+          <div className="mt-3 flex flex-wrap items-end gap-3">
             <label className="text-sm text-neutral-700">
               Nombre
-              <input name="nombre" required className={`${inputClass} mt-1 w-48`} />
+              <input
+                value={nombreClienteNuevo}
+                onChange={(evento) => setNombreClienteNuevo(evento.target.value)}
+                className={`${inputClass} mt-1 w-48`}
+              />
             </label>
             <label className="text-sm text-neutral-700">
               Teléfono
-              <input name="telefono" required className={`${inputClass} mt-1 w-40`} />
+              <input
+                value={telefonoClienteNuevo}
+                onChange={(evento) => setTelefonoClienteNuevo(evento.target.value)}
+                className={`${inputClass} mt-1 w-40`}
+              />
             </label>
-            <button
-              type="submit"
-              disabled={guardandoCliente}
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
-            >
-              {guardandoCliente ? "Creando…" : "Crear y usar"}
-            </button>
             {clientes.length > 0 && (
               <button
                 type="button"
-                onClick={() => setMostrarNuevoCliente(false)}
+                onClick={() => {
+                  setMostrarNuevoCliente(false);
+                  setNombreClienteNuevo("");
+                  setTelefonoClienteNuevo("");
+                }}
                 className="text-sm text-neutral-500 hover:text-neutral-800"
               >
                 Cancelar
               </button>
             )}
-            {estadoCliente.error && (
-              <p className="w-full text-sm text-red-600">{estadoCliente.error}</p>
-            )}
-          </form>
+          </div>
         )}
       </section>
 
@@ -411,27 +503,15 @@ export function NuevoPedidoForm({
         </dl>
       </section>
 
-      <form action={formActionPedido}>
-        <input type="hidden" name="clienteId" value={clienteId} />
-        <input type="hidden" name="itemsJson" value={itemsJson} />
-        <input type="hidden" name="modoAnticipo" value={modoAnticipo} />
-        <input type="hidden" name="porcentajeAnticipo" value={porcentajeAnticipo} />
-        <input type="hidden" name="montoAnticipoFijo" value={montoAnticipoFijo} />
-        <input type="hidden" name="fechaPrometida" value={fechaPrometida} />
-        <input type="hidden" name="notas" value={notas} />
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
-        {estadoPedido.error && (
-          <p className="mb-3 text-sm text-red-600">{estadoPedido.error}</p>
-        )}
-
-        <button
-          type="submit"
-          disabled={guardandoPedido || !clienteId || itemsValidos.length === 0}
-          className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
-        >
-          {guardandoPedido ? "Creando pedido…" : "Crear pedido"}
-        </button>
-      </form>
-    </div>
+      <button
+        type="submit"
+        disabled={pending || !clienteListo || itemsValidos.length === 0}
+        className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
+      >
+        {pending ? "Creando pedido…" : "Crear pedido"}
+      </button>
+    </form>
   );
 }

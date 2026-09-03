@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { fechaDesdeInputHonduras } from "@/lib/fecha";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarMovimientoCompartido } from "@/lib/inventario/registrar";
 
 export type MaterialFormState = { error?: string; ok?: boolean };
 
@@ -158,8 +159,6 @@ export async function registrarMovimiento(
 
   const materialId = String(formData.get("materialId") || "").trim();
   const tipo = String(formData.get("tipo") || "").trim();
-  // "cantidad" está en unidades de compra (ej: bolsas), no en la unidad de
-  // medida del material -- se convierte más abajo con cantidadPorUnidad.
   const cantidad = Number(formData.get("cantidad"));
   const costoRaw = formData.get("costo");
   const costo = costoRaw && String(costoRaw).trim() ? Number(costoRaw) : null;
@@ -168,105 +167,23 @@ export async function registrarMovimiento(
   const proveedorId = String(formData.get("proveedorId") || "").trim();
   const esCredito = formData.get("esCredito") === "on";
 
-  if (!materialId) return { error: "Selecciona un material." };
   if (tipo !== "ENTRADA" && tipo !== "SALIDA") {
     return { error: "Selecciona si es una entrada o una salida." };
   }
-  if (!Number.isFinite(cantidad) || cantidad <= 0) {
-    return { error: "La cantidad debe ser un número mayor a 0." };
-  }
-  if (costo !== null && (!Number.isFinite(costo) || costo < 0)) {
-    return { error: "El costo no es válido." };
-  }
 
-  const material = await prisma.materialInventario.findUnique({
-    where: { id: materialId },
-  });
-  if (!material) return { error: "Ese material ya no existe." };
-
-  const cantidadPorUnidad = Number(material.cantidadPorUnidad);
-  // Cuánto se suma/resta de verdad al stock (en la unidad de medida del
-  // material), no la cantidad de unidades de compra que se escribió.
-  const cantidadEnUnidadBase = cantidad * cantidadPorUnidad;
-
-  if (tipo === "SALIDA" && cantidadEnUnidadBase > Number(material.cantidadActual)) {
-    return {
-      error: `No hay suficiente stock: quedan ${material.cantidadActual.toString()} ${material.unidadMedida}.`,
-    };
-  }
-
-  if (esCompra) {
-    if (tipo !== "ENTRADA") {
-      return { error: "Una compra solo aplica a una entrada de inventario." };
-    }
-    if (!proveedorId) return { error: "Selecciona el proveedor de la compra." };
-    if (costo === null || costo <= 0) {
-      return { error: "Escribe el costo por unidad para calcular el total de la compra." };
-    }
-  }
-
-  // El monto total de la compra siempre se calcula acá (cantidad × costo
-  // por unidad de compra) -- nunca se recibe como valor aparte del
-  // formulario, así no hay dos números que puedan quedar desincronizados.
-  const montoTotal = costo !== null ? Math.round(cantidad * costo * 100) / 100 : 0;
-
-  const deltaStock = tipo === "ENTRADA" ? cantidadEnUnidadBase : -cantidadEnUnidadBase;
-
-  const movimientoId = await prisma.$transaction(async (tx) => {
-    let compraId: string | null = null;
-    if (esCompra) {
-      const compra = await tx.compra.create({
-        data: { proveedorId, montoTotal, notas, pagada: !esCredito },
-      });
-      compraId = compra.id;
-
-      // Gasto automático: una compra de material ES un gasto, no hace
-      // falta volver a escribirlo en Finanzas -- PERO solo si se paga de
-      // una vez. Si es a crédito, el Gasto se crea después, cuando se
-      // marque la compra como pagada (ver marcarCompraPagada más abajo) --
-      // así Finanzas refleja cuándo sale la plata de verdad, no cuándo
-      // llegó el material.
-      if (!esCredito) {
-        const proveedor = await tx.proveedor.findUnique({ where: { id: proveedorId } });
-        await tx.gasto.create({
-          data: {
-            categoria: "MATERIALES",
-            monto: montoTotal,
-            fecha: compra.fecha,
-            compraId: compra.id,
-            descripcion: `Compra de ${material.nombre}${proveedor ? ` a ${proveedor.nombre}` : ""}`,
-          },
-        });
-      }
-    }
-
-    const movimiento = await tx.movimientoInventario.create({
-      data: { materialId, tipo, cantidad, cantidadPorUnidad, costo, compraId, notas },
-    });
-
-    await tx.materialInventario.update({
-      where: { id: materialId },
-      data: {
-        cantidadActual: { increment: deltaStock },
-        // El "costo" del material siempre refleja la última entrada con
-        // costo -- así solo se captura un precio en un solo lugar (acá),
-        // nunca por separado al crear/editar el material.
-        ...(tipo === "ENTRADA" && costo !== null ? { costo } : {}),
-      },
-    });
-
-    return movimiento.id;
+  const resultado = await registrarMovimientoCompartido({
+    materialId,
+    tipo,
+    cantidad,
+    costo,
+    notas,
+    esCompra,
+    proveedorId,
+    esCredito,
   });
 
-  await registrarAuditoria({
-    accion: "crear",
-    entidad: "MovimientoInventario",
-    entidadId: movimientoId,
-    detalle: `${tipo} de ${material.nombre} (${cantidad}${esCompra ? `, compra L. ${montoTotal}` : ""})`,
-  });
+  if (resultado.error) return { error: resultado.error };
 
-  // Mismo criterio que crearMaterial: sin redirect, para que el modal de
-  // "Registrar movimiento" se cierre solo (via el ok:true) en vez de navegar.
   revalidatePath("/admin/inventario");
   revalidatePath(`/admin/inventario/${materialId}`);
   revalidatePath("/admin/finanzas");

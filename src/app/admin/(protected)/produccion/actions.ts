@@ -5,24 +5,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarProduccionCompartido } from "@/lib/produccion/registrar";
 
 export type ProduccionFormState = { error?: string };
 
 /**
- * Registra la producción de un empleado en un producto y/o su mezcla del
- * día. Son dos cosas independientes que comparten un solo formulario porque
- * en la práctica se registran juntas: un empleado puede solo producir, solo
- * hacer mezcla, o ambas el mismo día.
- *
- * El pago unitario se copia de PagoUnitarioProducto al momento del registro
- * (snapshot, igual que el precio de los productos en un pedido) -- si
- * después se cambia la tarifa configurada, los registros ya guardados no se
- * alteran. Lo mismo aplica al monto de mezcla: se guarda el valor que se
- * haya escrito en el formulario, editable cada vez.
- *
- * Las unidades defectuosas se restan de lo que se paga (no se le paga al
- * empleado por piezas que salieron mal), pero se guardan aparte para poder
- * ver el porcentaje de defectos por empleado/producto más adelante.
+ * Server Action original -- ya NO la usa el formulario (ver
+ * NuevoRegistroProduccionForm.tsx: ahora pasa por
+ * POST /api/offline/produccion para que funcione igual con o sin conexión,
+ * ver propuesta-modo-offline.md). Se deja funcionando, delegando a la
+ * misma lógica compartida (src/lib/produccion/registrar.ts) que usa esa
+ * ruta, para que no haya dos copias de las reglas de negocio.
  */
 export async function registrarProduccion(
   _prevState: ProduccionFormState,
@@ -38,95 +31,17 @@ export async function registrarProduccion(
   const hizoMezcla = formData.get("hizoMezcla") === "on";
   const montoMezcla = Number(formData.get("montoMezcla"));
 
-  if (!empleadoId) return { error: "Selecciona un empleado." };
-
-  const registraProduccion = Boolean(productoId);
-
-  if (!registraProduccion && !hizoMezcla) {
-    return { error: "Selecciona un producto o marca que hizo mezcla." };
-  }
-
-  let pagoUnitario = 0;
-  let totalGanado = 0;
-
-  if (registraProduccion) {
-    if (!Number.isInteger(cantidadProducida) || cantidadProducida <= 0) {
-      return { error: "La cantidad producida debe ser un número entero mayor a 0." };
-    }
-    if (!Number.isInteger(unidadesDefectuosas) || unidadesDefectuosas < 0) {
-      return { error: "Las unidades defectuosas deben ser un número entero, 0 o más." };
-    }
-    if (unidadesDefectuosas > cantidadProducida) {
-      return { error: "Las unidades defectuosas no pueden ser más que lo producido." };
-    }
-
-    const pagoUnitarioProducto = await prisma.pagoUnitarioProducto.findUnique({
-      where: { productoId },
-    });
-    if (!pagoUnitarioProducto) {
-      return {
-        error:
-          "Este producto todavía no tiene un pago unitario configurado. Configúralo primero en \"Pago por unidad\".",
-      };
-    }
-
-    pagoUnitario = Number(pagoUnitarioProducto.monto);
-    const unidadesPagadas = cantidadProducida - unidadesDefectuosas;
-    totalGanado = Math.round(unidadesPagadas * pagoUnitario * 100) / 100;
-  }
-
-  if (hizoMezcla && (!Number.isFinite(montoMezcla) || montoMezcla <= 0)) {
-    return { error: "El monto de mezcla no es válido." };
-  }
-
-  const { registroId, mezclaId } = await prisma.$transaction(async (tx) => {
-    let registroId: string | null = null;
-    let mezclaId: string | null = null;
-
-    if (registraProduccion) {
-      const registro = await tx.registroProduccion.create({
-        data: {
-          empleadoId,
-          productoId,
-          cantidadProducida,
-          unidadesDefectuosas,
-          pagoUnitario,
-          totalGanado,
-          notas,
-        },
-      });
-      registroId = registro.id;
-    }
-    if (hizoMezcla) {
-      const mezcla = await tx.registroMezcla.create({
-        data: { empleadoId, monto: montoMezcla, notas },
-      });
-      mezclaId = mezcla.id;
-    }
-
-    return { registroId, mezclaId };
+  const resultado = await registrarProduccionCompartido({
+    empleadoId,
+    productoId,
+    cantidadProducida,
+    unidadesDefectuosas,
+    notas,
+    hizoMezcla,
+    montoMezcla,
   });
 
-  // Los llamados a registrarAuditoria van DESPUES de que la transaccion ya
-  // confirmo -- adentro usaria el cliente global de prisma (no `tx`) y
-  // ademas llama a Supabase auth por red, lo que dejaria la transaccion
-  // interactiva abierta de mas y podria toparse con su timeout.
-  if (registroId) {
-    await registrarAuditoria({
-      accion: "crear",
-      entidad: "RegistroProduccion",
-      entidadId: registroId,
-      detalle: `${cantidadProducida} unidad(es) -- L. ${totalGanado}`,
-    });
-  }
-  if (mezclaId) {
-    await registrarAuditoria({
-      accion: "crear",
-      entidad: "RegistroMezcla",
-      entidadId: mezclaId,
-      detalle: `L. ${montoMezcla}`,
-    });
-  }
+  if (resultado.error) return { error: resultado.error };
 
   revalidatePath("/admin/produccion");
   redirect("/admin/produccion");

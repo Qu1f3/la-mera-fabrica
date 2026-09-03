@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { obtenerAdminUsuario } from "@/lib/supabase/adminUsuario";
 import { ToastProvider } from "@/components/admin/ui/Toast";
+import { EstadoConexion } from "@/components/admin/offline/EstadoConexion";
+import { ConflictosPendientes } from "@/components/admin/offline/ConflictosPendientes";
 import { AdminNav } from "./AdminNav";
 import { signOut } from "./actions";
 
@@ -33,6 +35,8 @@ export default async function ProtectedAdminLayout({
 
   return (
     <ToastProvider>
+      <EstadoConexion />
+      <ConflictosPendientes />
       <div className="flex min-h-screen flex-col bg-neutral-50 md:flex-row">
         <AdminNav
           userEmail={user.email ?? ""}

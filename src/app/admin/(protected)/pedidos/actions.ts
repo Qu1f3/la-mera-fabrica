@@ -4,17 +4,18 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { obtenerAdminUsuario } from "@/lib/supabase/adminUsuario";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { fechaDesdeInputHonduras } from "@/lib/fecha";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { generarCodigoPedido } from "@/lib/pedidoCodigo";
-import { calcularSubtotal, calcularTotalesPedido } from "@/lib/pedidoTotales";
-import type { EstadoPedido, EstadoEntrega, ItemPedidoFormulario } from "@/lib/types";
+import { registrarPedidoCompartido, type ItemPedidoInput } from "@/lib/pedidos/crear";
+import { cambiarEstadoPedidoCompartido } from "@/lib/pedidos/estado";
+import { asignarFechaPrometidaCompartido } from "@/lib/pedidos/fecha";
+import { registrarRiegoCompartido } from "@/lib/pedidos/riego";
+import { crearEntregaCompartido } from "@/lib/pedidos/entrega";
+import type { EstadoPedido, EstadoEntrega } from "@/lib/types";
 
 export type PedidoFormState = { error?: string };
 
-function parsearItems(valor: FormDataEntryValue | null): ItemPedidoFormulario[] | null {
+function parsearItems(valor: FormDataEntryValue | null): ItemPedidoInput[] | null {
   try {
     const items = JSON.parse(String(valor ?? "[]"));
     if (!Array.isArray(items)) return null;
@@ -31,17 +32,25 @@ function parsearItems(valor: FormDataEntryValue | null): ItemPedidoFormulario[] 
         return null;
       }
     }
-    return items as ItemPedidoFormulario[];
+    return items as ItemPedidoInput[];
   } catch {
     return null;
   }
 }
 
+/**
+ * Se deja funcionando (mismo contrato de FormData de siempre) pero ya no
+ * la llama el formulario -- ver NuevoPedidoForm.tsx, que ahora pasa por
+ * la cola sin conexión (src/lib/offline/sync.ts) contra
+ * /api/offline/pedidos, que es quien de verdad usa
+ * registrarPedidoCompartido hoy. Ver propuesta-modo-offline.md, Fase 4.
+ */
 export async function crearPedido(
   _prevState: PedidoFormState,
   formData: FormData
 ): Promise<PedidoFormState> {
   const user = await requireAdmin();
+  const adminUsuario = await obtenerAdminUsuario(user);
 
   const clienteId = String(formData.get("clienteId") || "").trim();
   if (!clienteId) return { error: "Selecciona o crea un cliente." };
@@ -51,97 +60,32 @@ export async function crearPedido(
     return { error: "Agrega al menos un producto con cantidad y precio válidos." };
   }
 
-  // El anticipo normalmente es un % del total, pero a veces el cliente deja
-  // un monto cerrado que no corresponde a ningún porcentaje redondo (ej:
-  // "hoy dejó L.3,000") -- modoAnticipo decide cuál de los dos números de
-  // abajo se usa (ver src/lib/pedidoTotales.ts).
-  const modoAnticipo = String(formData.get("modoAnticipo") || "PORCENTAJE");
-  let entradaAnticipo: Parameters<typeof calcularTotalesPedido>[1];
-
-  if (modoAnticipo === "MONTO_FIJO") {
-    const montoAnticipoFijo = Number(formData.get("montoAnticipoFijo"));
-    if (!Number.isFinite(montoAnticipoFijo) || montoAnticipoFijo < 0) {
-      return { error: "El monto de anticipo no es válido." };
-    }
-    const montoTotalItems = items.reduce(
-      (suma, item) => suma + item.cantidad * item.precioUnitario,
-      0
-    );
-    if (montoAnticipoFijo > montoTotalItems) {
-      return { error: "El anticipo no puede ser mayor que el total del pedido." };
-    }
-    entradaAnticipo = { modo: "MONTO_FIJO", monto: montoAnticipoFijo };
-  } else {
-    const porcentajeAnticipoRaw = Number(formData.get("porcentajeAnticipo"));
-    const porcentajeAnticipo = Number.isFinite(porcentajeAnticipoRaw)
-      ? porcentajeAnticipoRaw
-      : 60;
-    if (porcentajeAnticipo < 0 || porcentajeAnticipo > 100) {
-      return { error: "El porcentaje de anticipo debe estar entre 0 y 100." };
-    }
-    entradaAnticipo = { modo: "PORCENTAJE", porcentaje: porcentajeAnticipo };
-  }
-
-  const fechaPrometida = fechaDesdeInputHonduras(formData.get("fechaPrometida"));
+  const modoAnticipo = String(formData.get("modoAnticipo") || "PORCENTAJE") as
+    | "PORCENTAJE"
+    | "MONTO_FIJO";
+  const porcentajeAnticipo = Number(formData.get("porcentajeAnticipo"));
+  const montoAnticipoFijo = Number(formData.get("montoAnticipoFijo"));
+  const fechaPrometidaInput = String(formData.get("fechaPrometida") || "");
   const notas = String(formData.get("notas") || "").trim() || null;
 
-  const adminUsuario = await obtenerAdminUsuario(user);
-  const { montoTotal, montoAnticipo, porcentajeAnticipo, saldoPendiente } =
-    calcularTotalesPedido(items, entradaAnticipo);
-  const codigo = await generarCodigoPedido();
-
-  const pedido = await prisma.$transaction(async (tx) => {
-    const nuevo = await tx.pedido.create({
-      data: {
-        codigo,
-        clienteId,
-        fechaPrometida,
-        porcentajeAnticipo,
-        montoAnticipo,
-        montoTotal,
-        saldoPendiente,
-        notas,
-        items: {
-          create: items.map((item) => ({
-            productoId: item.productoId,
-            categoria: item.categoria || null,
-            diseno: item.diseno || null,
-            color: item.color || null,
-            cantidad: item.cantidad,
-            precioUnitario: item.precioUnitario,
-            subtotal: calcularSubtotal(item.cantidad, item.precioUnitario),
-          })),
-        },
-        historial: {
-          create: { estado: "PEDIDO_RECIBIDO", adminUsuarioId: adminUsuario.id },
-        },
-      },
-    });
-
-    // Ingreso automático: el anticipo de un pedido nuevo ES un ingreso, no
-    // hace falta que alguien lo vuelva a escribir en Finanzas. Ver
-    // cambiarEstadoPedido para el ingreso del pago final al entregar.
-    if (montoAnticipo > 0) {
-      await tx.ingreso.create({
-        data: {
-          categoria: "ANTICIPO",
-          monto: montoAnticipo,
-          fecha: new Date(),
-          pedidoId: nuevo.id,
-          descripcion: `Anticipo de pedido ${codigo}`,
-        },
-      });
-    }
-
-    return nuevo;
+  const resultado = await registrarPedidoCompartido({
+    adminUsuarioId: adminUsuario.id,
+    clienteId,
+    items,
+    modoAnticipo,
+    porcentajeAnticipo,
+    montoAnticipoFijo,
+    fechaPrometidaInput,
+    notas,
   });
-  await registrarAuditoria({ accion: "crear", entidad: "Pedido", entidadId: pedido.id, detalle: codigo });
+
+  if (resultado.error) return { error: resultado.error };
 
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/clientes/${clienteId}`);
   revalidatePath("/admin/finanzas");
   revalidatePath("/admin/reportes");
-  redirect(`/admin/pedidos/${pedido.id}`);
+  redirect(`/admin/pedidos/${resultado.pedidoId}`);
 }
 
 export async function cambiarEstadoPedido(
@@ -155,51 +99,20 @@ export async function cambiarEstadoPedido(
   const estado = String(formData.get("estado") || "") as EstadoPedido;
   const notas = String(formData.get("notas") || "").trim() || null;
 
-  const codigoPedido = await prisma.$transaction(async (tx) => {
-    const pedidoActual = await tx.pedido.findUniqueOrThrow({ where: { id: pedidoId } });
-
-    const data: Prisma.PedidoUpdateInput = { estado };
-    // Estos dos campos se completan solos al llegar al estado correspondiente
-    // -- nunca se piden a mano (ver instrucción: "no introducir manualmente
-    // los días transcurridos").
-    if (estado === "EN_SECADO") data.fechaInicioSecado = new Date();
-    if (estado === "ENTREGADO") data.fechaEntregaReal = new Date();
-
-    await tx.pedido.update({ where: { id: pedidoId }, data });
-    await tx.historialEstadoPedido.create({
-      data: { pedidoId, estado, adminUsuarioId: adminUsuario.id, notas },
-    });
-
-    // Ingreso automático: al llegar a ENTREGADO se asume cobrado el saldo
-    // que quedaba pendiente. Se busca primero para no duplicarlo si el
-    // pedido pasa por ENTREGADO más de una vez (se corrige el estado y se
-    // vuelve a marcar).
-    if (estado === "ENTREGADO" && Number(pedidoActual.saldoPendiente) > 0) {
-      const yaExiste = await tx.ingreso.findFirst({
-        where: { pedidoId, categoria: "PAGO_FINAL" },
-      });
-      if (!yaExiste) {
-        await tx.ingreso.create({
-          data: {
-            categoria: "PAGO_FINAL",
-            monto: pedidoActual.saldoPendiente,
-            fecha: new Date(),
-            pedidoId,
-            descripcion: `Pago final de pedido ${pedidoActual.codigo}`,
-          },
-        });
-      }
-    }
-
-    return pedidoActual.codigo;
+  const resultado = await cambiarEstadoPedidoCompartido({
+    pedidoId,
+    estado,
+    notas,
+    adminUsuarioId: adminUsuario.id,
   });
 
-  await registrarAuditoria({
-    accion: "cambiar_estado",
-    entidad: "Pedido",
-    entidadId: pedidoId,
-    detalle: `${codigoPedido} -> ${estado}`,
-  });
+  // Con conexión (este formulario/Server Action) no debería poder chocar
+  // -- no hay versionEsperada de por medio -- pero se cubre el caso por
+  // las dudas en vez de dejarlo pasar como éxito silencioso.
+  if (resultado.conflicto) {
+    return { error: "Alguien más cambió este pedido. Actualiza la página e intenta de nuevo." };
+  }
+  if (resultado.error) return { error: resultado.error };
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/pedidos");
@@ -214,11 +127,15 @@ export async function asignarFechaPrometida(
   formData: FormData
 ): Promise<PedidoFormState> {
   await requireAdmin();
-  const fechaPrometida = fechaDesdeInputHonduras(formData.get("fechaPrometida"));
-  if (!fechaPrometida) return { error: "La fecha no es válida." };
+  const fechaPrometidaInput = String(formData.get("fechaPrometida") || "");
 
-  await prisma.pedido.update({ where: { id: pedidoId }, data: { fechaPrometida } });
-  await registrarAuditoria({ accion: "editar", entidad: "Pedido", entidadId: pedidoId, detalle: "fecha prometida" });
+  const resultado = await asignarFechaPrometidaCompartido({ pedidoId, fechaPrometidaInput });
+
+  if (resultado.conflicto) {
+    return { error: "Alguien más cambió este pedido. Actualiza la página e intenta de nuevo." };
+  }
+  if (resultado.error) return { error: resultado.error };
+
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/pedidos");
   return {};
@@ -233,10 +150,13 @@ export async function registrarRiego(
   const adminUsuario = await obtenerAdminUsuario(user);
   const observacion = String(formData.get("observacion") || "").trim() || null;
 
-  const riego = await prisma.registroRiego.create({
-    data: { pedidoId, adminUsuarioId: adminUsuario.id, observacion },
+  const resultado = await registrarRiegoCompartido({
+    pedidoId,
+    adminUsuarioId: adminUsuario.id,
+    observacion,
   });
-  await registrarAuditoria({ accion: "crear", entidad: "RegistroRiego", entidadId: riego.id, detalle: observacion ?? undefined });
+
+  if (resultado.error) return { error: resultado.error };
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   return {};
@@ -253,11 +173,12 @@ export async function crearEntrega(
   formData: FormData
 ): Promise<PedidoFormState> {
   await requireAdmin();
-  const fechaProgramada = fechaDesdeInputHonduras(formData.get("fechaProgramada"));
+  const fechaProgramadaInput = String(formData.get("fechaProgramada") || "");
   const notas = String(formData.get("notas") || "").trim() || null;
 
-  const entrega = await prisma.entrega.create({ data: { pedidoId, fechaProgramada, notas } });
-  await registrarAuditoria({ accion: "crear", entidad: "Entrega", entidadId: entrega.id, detalle: pedidoId });
+  const resultado = await crearEntregaCompartido({ pedidoId, fechaProgramadaInput, notas });
+
+  if (resultado.error) return { error: resultado.error };
 
   revalidatePath(`/admin/pedidos/${pedidoId}`);
   revalidatePath("/admin/calendario");

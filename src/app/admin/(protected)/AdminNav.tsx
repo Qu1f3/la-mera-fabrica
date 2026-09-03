@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { RolAdmin } from "@prisma/client";
+import { esRutaSinConexion } from "@/lib/offline/rutas";
 
 type Enlace = { href: string; label: string; icono: string };
 type Grupo = { titulo: string; enlaces: Enlace[] };
@@ -91,17 +92,26 @@ function ListaEnlaces({
           <div className="mt-1 flex flex-col gap-0.5">
             {grupo.enlaces.map((enlace) => {
               const activo = estaActivo(pathname, enlace.href);
+              const clases = `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                activo
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+              }`;
+              // <a> a propósito (no <Link>) para las rutas sin conexión
+              // (ver propuesta-modo-offline.md): una transición del lado
+              // del cliente de Next.js no pasa por el caché del service
+              // worker, así que si no hay señal se rompe -- una
+              // navegación de verdad sí la puede servir desde caché.
+              if (esRutaSinConexion(enlace.href)) {
+                return (
+                  <a key={enlace.href} href={enlace.href} onClick={onClicEnlace} className={clases}>
+                    <span aria-hidden="true">{enlace.icono}</span>
+                    {enlace.label}
+                  </a>
+                );
+              }
               return (
-                <Link
-                  key={enlace.href}
-                  href={enlace.href}
-                  onClick={onClicEnlace}
-                  className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    activo
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
-                  }`}
-                >
+                <Link key={enlace.href} href={enlace.href} onClick={onClicEnlace} className={clases}>
                   <span aria-hidden="true">{enlace.icono}</span>
                   {enlace.label}
                 </Link>

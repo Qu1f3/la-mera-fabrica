@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/supabase/requireAdmin";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { registrarPagoExtraCompartido } from "@/lib/extras/registrar";
 
 export type TipoPagoExtraFormState = { error?: string };
 
@@ -54,10 +55,16 @@ export async function alternarActivoTipoPagoExtra(
 export type PagoExtraFormState = { error?: string };
 
 /**
- * Registra un pago extra para un empleado. La descripción y el monto se
- * copian tal cual vengan del formulario (no se leen "en vivo" de
- * TipoPagoExtra después) -- así, si el tipo se edita o desactiva más
- * adelante, los pagos ya registrados no cambian.
+ * Server Action original -- ya NO la usa el formulario (ver
+ * NuevoPagoExtraForm.tsx: ahora pasa por POST /api/offline/extras para que
+ * funcione igual con o sin conexión, ver propuesta-modo-offline.md). Se
+ * deja funcionando, delegando a la misma lógica compartida
+ * (src/lib/extras/registrar.ts) que usa esa ruta.
+ *
+ * A diferencia de la ruta de API (que recibe el monto ya con el signo
+ * aplicado, porque el navegador ya lo conoce), esta Server Action todavía
+ * resuelve el signo consultando TipoPagoExtra -- es el contrato original,
+ * con FormData plano, y se mantiene tal cual.
  */
 export async function registrarPagoExtra(
   _prevState: PagoExtraFormState,
@@ -71,16 +78,10 @@ export async function registrarPagoExtra(
   const montoIngresado = Number(formData.get("monto"));
   const notas = String(formData.get("notas") || "").trim() || null;
 
-  if (!empleadoId) return { error: "Selecciona un empleado." };
-  if (!descripcion) return { error: "La descripción es obligatoria." };
   if (!Number.isFinite(montoIngresado) || montoIngresado < 0) {
     return { error: "El monto no es válido." };
   }
 
-  // El usuario siempre escribe el monto en positivo ("250"); si el tipo
-  // elegido resta del pago semanal (ej. "Prestamo"), se guarda en negativo
-  // para que la suma de Pagos semanales (Prisma _sum sobre monto) lo reste
-  // solo, sin tener que tocar ese calculo. "Otro" (sin tipo) siempre suma.
   let monto = montoIngresado;
   if (tipoPagoExtraId) {
     const tipo = await prisma.tipoPagoExtra.findUnique({
@@ -90,15 +91,14 @@ export async function registrarPagoExtra(
     if (tipo?.signo === "RESTA") monto = -montoIngresado;
   }
 
-  const pago = await prisma.pagoExtraEmpleado.create({
-    data: { empleadoId, tipoPagoExtraId, descripcion, monto, notas },
+  const resultado = await registrarPagoExtraCompartido({
+    empleadoId,
+    tipoPagoExtraId,
+    descripcion,
+    monto,
+    notas,
   });
-  await registrarAuditoria({
-    accion: "crear",
-    entidad: "PagoExtraEmpleado",
-    entidadId: pago.id,
-    detalle: `${descripcion} (L. ${monto})`,
-  });
+  if (resultado.error) return { error: resultado.error };
 
   revalidatePath("/admin/extras");
   revalidatePath("/admin/pagos-semanales");

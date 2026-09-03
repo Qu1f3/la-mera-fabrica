@@ -149,9 +149,12 @@ export default async function DetallePedidoPage({
 
   return (
     <div className="max-w-3xl">
-      <Link href="/admin/pedidos" className="text-sm text-neutral-500 hover:text-neutral-800">
+      {/* <a> normal (no <Link>) -- ruta sin conexión, ver AdminNav.tsx y
+          propuesta-modo-offline.md. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a propósito, ver comentario arriba */}
+      <a href="/admin/pedidos" className="text-sm text-neutral-500 hover:text-neutral-800">
         ← Pedidos
-      </Link>
+      </a>
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -232,6 +235,7 @@ export default async function DetallePedidoPage({
                 ? pedido.fechaPrometida.toISOString().slice(0, 10)
                 : ""
             }
+            actualizadoEn={pedido.actualizadoEn.toISOString()}
           />
           {pedido.fechaEntregaReal && (
             <p className="mt-2 text-sm text-neutral-600">
@@ -298,6 +302,7 @@ export default async function DetallePedidoPage({
           pedidoId={pedido.id}
           estadoActual={pedido.estado}
           estados={ESTADOS}
+          actualizadoEn={pedido.actualizadoEn.toISOString()}
         />
       </section>
 

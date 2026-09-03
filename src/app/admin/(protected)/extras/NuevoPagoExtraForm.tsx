@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { registrarPagoExtra } from "./actions";
-import { useToastAccion } from "@/components/admin/ui/Toast";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useToast } from "@/components/admin/ui/Toast";
 import { Combobox } from "@/components/admin/ui/Combobox";
+import { encolarExtra, generarIdLocal } from "@/lib/offline/sync";
 
 const inputClass =
   "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none";
@@ -29,6 +29,14 @@ type TipoOpcion = {
  * tocar. Al elegir uno, la Descripción se llena sola y no se vuelve a
  * mostrar -- solo se pide el Monto. Solo si el trabajo no calza con ningún
  * tipo (botón "Otro") se pide escribir de qué se trató.
+ *
+ * Desde la Fase 2 de "modo sin conexión" (ver propuesta-modo-offline.md)
+ * ya no manda a una Server Action -- guarda con encolarExtra(), que
+ * funciona igual con o sin señal, y el signo (suma/resta) se aplica acá
+ * mismo antes de guardar (el navegador ya lo sabe, es lo mismo dato que
+ * pinta los botones en rojo) en vez de que el servidor tenga que ir a
+ * buscarlo a la base -- así no hace falta estar en línea para saber si un
+ * "Préstamo" resta.
  */
 export function NuevoPagoExtraForm({
   empleados,
@@ -37,32 +45,15 @@ export function NuevoPagoExtraForm({
   empleados: { id: string; nombre: string }[];
   tipos: TipoOpcion[];
 }) {
-  const [state, formAction, pending] = useActionState(registrarPagoExtra, {});
-  useToastAccion(state, "Pago extra registrado.");
+  const { mostrarToast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
   const [empleadoId, setEmpleadoId] = useState("");
   const [seleccion, setSeleccion] = useState(""); // "" | OTRO | id de un TipoPagoExtra
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [mostrarNotas, setMostrarNotas] = useState(false);
-
-  // Al registrar el pago con éxito, se limpia todo el formulario -- si los
-  // campos se quedan llenos con el último pago, mi mamá no está segura de
-  // que se guardó y le da doble click a "Registrar pago extra".
-  const primerRender = useRef(true);
-  useEffect(() => {
-    if (primerRender.current) {
-      primerRender.current = false;
-      return;
-    }
-    if (!state.error) {
-      setEmpleadoId("");
-      setSeleccion("");
-      setDescripcion("");
-      setMonto("");
-      setMostrarNotas(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const opcionesEmpleado = useMemo(
     () => empleados.map((e) => ({ id: e.id, etiqueta: e.nombre })),
@@ -87,8 +78,58 @@ export function NuevoPagoExtraForm({
   const tipoSeleccionado = tipos.find((t) => t.id === seleccion);
   const esResta = tipoSeleccionado?.signo === "RESTA";
 
+  async function alEnviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setError(null);
+
+    const montoNum = Number(monto);
+    const descripcionFinal = descripcion.trim();
+    const notas = String(new FormData(evento.currentTarget).get("notas") || "").trim() || null;
+
+    if (!empleadoId) {
+      setError("Selecciona un empleado.");
+      return;
+    }
+    if (!descripcionFinal) {
+      setError("La descripción es obligatoria.");
+      return;
+    }
+    if (!Number.isFinite(montoNum) || montoNum < 0) {
+      setError("El monto no es válido.");
+      return;
+    }
+
+    const montoFinal = esResta ? -montoNum : montoNum;
+
+    setPending(true);
+    try {
+      await encolarExtra({
+        id: generarIdLocal(),
+        empleadoId,
+        tipoPagoExtraId: tipoPagoExtraId || null,
+        descripcion: descripcionFinal,
+        monto: montoFinal,
+        notas,
+      });
+      mostrarToast("Pago extra registrado.");
+      // Se limpia todo el formulario -- si los campos se quedan llenos con
+      // el último pago, mi mamá no está segura de que se guardó y le da
+      // doble click a "Registrar pago extra".
+      setEmpleadoId("");
+      setSeleccion("");
+      setDescripcion("");
+      setMonto("");
+      setMostrarNotas(false);
+      formRef.current?.reset();
+    } catch {
+      setError("No se pudo guardar en este dispositivo. Intenta de nuevo.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="mt-3 space-y-4">
+    <form ref={formRef} onSubmit={alEnviar} className="mt-3 space-y-4">
       <label className="block text-xs text-neutral-500">
         ¿Quién hizo el trabajo?
         <Combobox
@@ -186,11 +227,7 @@ export function NuevoPagoExtraForm({
         </button>
       )}
 
-      <input type="hidden" name="empleadoId" value={empleadoId} />
-      <input type="hidden" name="tipoPagoExtraId" value={tipoPagoExtraId} />
-      {!esOtro && <input type="hidden" name="descripcion" value={descripcion} />}
-
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
         type="submit"

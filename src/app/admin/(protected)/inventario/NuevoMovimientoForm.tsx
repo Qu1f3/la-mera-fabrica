@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
-import { registrarMovimiento } from "./actions";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { encolarMovimiento, generarIdLocal } from "@/lib/offline/sync";
 import { Combobox } from "@/components/admin/ui/Combobox";
 
 const inputClass =
@@ -23,6 +23,18 @@ type MaterialOpcion = {
  * Combobox, solo un rótulo) -- eso es lo que hace que registrar algo tome
  * un clic y escribir la cantidad, en vez de navegar a otra página y volver
  * a elegir el material.
+ *
+ * Desde la Fase 3 de "modo sin conexión" (ver propuesta-modo-offline.md)
+ * ya no manda a una Server Action -- guarda con encolarMovimiento(), que
+ * funciona igual con o sin señal. La comprobación de "no dejar el stock en
+ * negativo" NO se puede hacer de verdad en el navegador (necesitaría saber
+ * el stock real en el servidor en este instante, que sin conexión no se
+ * puede pedir) -- se muestra un aviso NO bloqueante usando el último stock
+ * que se vio con señal, pero la comprobación real ocurre siempre en el
+ * servidor cuando el movimiento se sincroniza (ver
+ * src/lib/inventario/registrar.ts); si en ese momento ya no alcanza, el
+ * movimiento se queda pendiente con el error visible en el banner de
+ * arriba en vez de aplicarse a la fuerza.
  */
 export function NuevoMovimientoForm({
   materiales,
@@ -35,7 +47,7 @@ export function NuevoMovimientoForm({
   materialIdInicial?: string | null;
   onSuccess?: () => void;
 }) {
-  const [state, formAction, pending] = useActionState(registrarMovimiento, {});
+  const formRef = useRef<HTMLFormElement>(null);
   const [materialId, setMaterialId] = useState(materialIdInicial ?? "");
   const [tipo, setTipo] = useState<"ENTRADA" | "SALIDA">("ENTRADA");
   const [esCompra, setEsCompra] = useState(false);
@@ -44,10 +56,8 @@ export function NuevoMovimientoForm({
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
   const [mostrarNotas, setMostrarNotas] = useState(false);
-
-  useEffect(() => {
-    if (state.ok) onSuccess?.();
-  }, [state.ok, onSuccess]);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const opcionesMaterial = useMemo(
     () =>
@@ -76,8 +86,15 @@ export function NuevoMovimientoForm({
       : "Cantidad";
 
   const cantidadEnUnidadBase =
-    materialSeleccionado && Number(cantidad) > 0
-      ? Number(cantidad) * factorConversion
+    materialSeleccionado && Number(cantidad) > 0 ? Number(cantidad) * factorConversion : null;
+
+  // Aviso NO bloqueante -- ver comentario grande arriba del componente.
+  const avisoStockSegunUltimaVezConSenal =
+    tipo === "SALIDA" &&
+    materialSeleccionado !== null &&
+    cantidadEnUnidadBase !== null &&
+    cantidadEnUnidadBase > Number(materialSeleccionado.cantidadActual)
+      ? `Según la última vez que hubo señal, solo quedaban ${materialSeleccionado.cantidadActual} ${materialSeleccionado.unidadMedida} -- si de verdad no alcanza, esto quedará pendiente sin aplicarse hasta que lo revises.`
       : null;
 
   const montoCalculado =
@@ -94,18 +111,78 @@ export function NuevoMovimientoForm({
     }
   }
 
+  async function alEnviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setError(null);
+
+    const notas = String(new FormData(evento.currentTarget).get("notas") || "").trim() || null;
+    const cantidadNum = Number(cantidad);
+    const costoNum = costo.trim() ? Number(costo) : null;
+
+    if (!materialId) {
+      setError("Selecciona un material.");
+      return;
+    }
+    if (!Number.isFinite(cantidadNum) || cantidadNum <= 0) {
+      setError("La cantidad debe ser un número mayor a 0.");
+      return;
+    }
+    if (costoNum !== null && (!Number.isFinite(costoNum) || costoNum < 0)) {
+      setError("El costo no es válido.");
+      return;
+    }
+    if (esCompra) {
+      if (!proveedorId) {
+        setError("Selecciona el proveedor de la compra.");
+        return;
+      }
+      if (costoNum === null || costoNum <= 0) {
+        setError("Escribe el costo por unidad para calcular el total de la compra.");
+        return;
+      }
+    }
+
+    setPending(true);
+    try {
+      await encolarMovimiento({
+        idMovimiento: generarIdLocal(),
+        idCompra: esCompra ? generarIdLocal() : undefined,
+        idGasto: esCompra && !esCredito ? generarIdLocal() : undefined,
+        materialId,
+        tipo,
+        cantidad: cantidadNum,
+        costo: costoNum,
+        notas,
+        esCompra,
+        proveedorId: esCompra ? proveedorId : "",
+        esCredito,
+      });
+      onSuccess?.();
+      formRef.current?.reset();
+      setMaterialId(materialIdInicial ?? "");
+      setTipo("ENTRADA");
+      setEsCompra(false);
+      setEsCredito(false);
+      setProveedorId("");
+      setCantidad("");
+      setCosto("");
+      setMostrarNotas(false);
+    } catch {
+      setError("No se pudo guardar en este dispositivo. Intenta de nuevo.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="grid grid-cols-1 gap-3">
+    <form ref={formRef} onSubmit={alEnviar} className="grid grid-cols-1 gap-3">
       {materialIdInicial && materialSeleccionado ? (
         <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
           <span className="text-neutral-500">Material: </span>
-          <span className="font-medium text-neutral-900">
-            {materialSeleccionado.nombre}
-          </span>
+          <span className="font-medium text-neutral-900">{materialSeleccionado.nombre}</span>
           <span className="text-neutral-500">
             {" "}
-            — stock actual: {materialSeleccionado.cantidadActual}{" "}
-            {materialSeleccionado.unidadMedida}
+            — stock actual: {materialSeleccionado.cantidadActual} {materialSeleccionado.unidadMedida}
           </span>
         </div>
       ) : (
@@ -168,6 +245,9 @@ export function NuevoMovimientoForm({
           </span>
         )}
       </label>
+      {avisoStockSegunUltimaVezConSenal && (
+        <p className="text-xs text-amber-700">{avisoStockSegunUltimaVezConSenal}</p>
+      )}
       {tipo === "ENTRADA" && (
         <label className="text-xs text-neutral-500">
           Costo por unidad de compra (opcional)
@@ -202,7 +282,6 @@ export function NuevoMovimientoForm({
           <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
             <input
               type="checkbox"
-              name="esCompra"
               checked={esCompra}
               onChange={(e) => setEsCompra(e.target.checked)}
               className="h-4 w-4 rounded border-neutral-300"
@@ -230,7 +309,6 @@ export function NuevoMovimientoForm({
               <label className="flex items-center gap-2 text-sm text-neutral-700">
                 <input
                   type="checkbox"
-                  name="esCredito"
                   checked={esCredito}
                   onChange={(e) => setEsCredito(e.target.checked)}
                   className="h-4 w-4 rounded border-neutral-300"
@@ -240,7 +318,8 @@ export function NuevoMovimientoForm({
               {esCredito && (
                 <p className="text-xs text-neutral-500">
                   No se registrará el gasto todavía. Cuando la pagues, márcala como
-                  pagada desde la lista de compras pendientes en esta misma página.
+                  pagada desde la lista de compras pendientes en esta misma página
+                  (necesita conexión).
                 </p>
               )}
             </div>
@@ -248,11 +327,7 @@ export function NuevoMovimientoForm({
         </div>
       )}
 
-      <input type="hidden" name="materialId" value={materialId} />
-      <input type="hidden" name="tipo" value={tipo} />
-      <input type="hidden" name="proveedorId" value={esCompra ? proveedorId : ""} />
-
-      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
         type="submit"

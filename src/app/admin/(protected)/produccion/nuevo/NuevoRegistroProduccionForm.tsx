@@ -1,13 +1,24 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { registrarProduccion } from "../actions";
-import { useToastAccion } from "@/components/admin/ui/Toast";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useToast } from "@/components/admin/ui/Toast";
 import { Combobox } from "@/components/admin/ui/Combobox";
+import { encolarProduccion, generarIdLocal } from "@/lib/offline/sync";
 
 const inputClass =
   "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none";
 
+/**
+ * Antes este formulario mandaba a una Server Action (useActionState) y, al
+ * terminar bien, redirigía a /admin/produccion. Desde la Fase 2 de "modo
+ * sin conexión" (ver propuesta-modo-offline.md), guarda con
+ * encolarProduccion() -- que funciona igual con o sin señal -- y se queda
+ * en la página limpiando el formulario (mismo patrón que ya usaba
+ * NuevoPagoExtraForm.tsx en Extras), en vez de redirigir: la lista de
+ * /admin/produccion necesita conexión para volver a cargar, así que
+ * redirigir ahí justo después de un registro hecho sin señal dejaría a
+ * quien lo usa mirando una pantalla que no carga.
+ */
 export function NuevoRegistroProduccionForm({
   empleados,
   productos,
@@ -22,12 +33,14 @@ export function NuevoRegistroProduccionForm({
   }[];
   montoMezclaDefault: string;
 }) {
-  const [state, formAction, pending] = useActionState(registrarProduccion, {});
-  useToastAccion(state, "Registro de producción guardado.");
+  const { mostrarToast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
   const [empleadoId, setEmpleadoId] = useState("");
   const [productoId, setProductoId] = useState("");
   const [hizoMezcla, setHizoMezcla] = useState(false);
   const [mostrarNotas, setMostrarNotas] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const opcionesEmpleado = useMemo(
     () => empleados.map((e) => ({ id: e.id, etiqueta: e.nombre })),
@@ -43,8 +56,77 @@ export function NuevoRegistroProduccionForm({
     [productos]
   );
 
+  async function alEnviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setError(null);
+
+    const formData = new FormData(evento.currentTarget);
+    const cantidadProducida = Number(formData.get("cantidadProducida"));
+    const unidadesDefectuosas = Number(formData.get("unidadesDefectuosas") || 0);
+    const notas = String(formData.get("notas") || "").trim() || null;
+    const montoMezcla = Number(formData.get("montoMezcla"));
+
+    // Mismas validaciones que antes hacía la Server Action -- ahora tienen
+    // que vivir acá porque el envío nunca pasa por ella (el servidor las
+    // vuelve a hacer de todos modos cuando el registro llega, ver
+    // src/lib/produccion/registrar.ts, pero para entonces ya pasaron horas
+    // y no hay forma de corregir el formulario a mano).
+    if (!empleadoId) {
+      setError("Selecciona un empleado.");
+      return;
+    }
+    const registraProduccion = Boolean(productoId);
+    if (!registraProduccion && !hizoMezcla) {
+      setError("Selecciona un producto o marca que hizo mezcla.");
+      return;
+    }
+    if (registraProduccion) {
+      if (!Number.isInteger(cantidadProducida) || cantidadProducida <= 0) {
+        setError("La cantidad producida debe ser un número entero mayor a 0.");
+        return;
+      }
+      if (!Number.isInteger(unidadesDefectuosas) || unidadesDefectuosas < 0) {
+        setError("Las unidades defectuosas deben ser un número entero, 0 o más.");
+        return;
+      }
+      if (unidadesDefectuosas > cantidadProducida) {
+        setError("Las unidades defectuosas no pueden ser más que lo producido.");
+        return;
+      }
+    }
+    if (hizoMezcla && (!Number.isFinite(montoMezcla) || montoMezcla <= 0)) {
+      setError("El monto de mezcla no es válido.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      await encolarProduccion({
+        idRegistro: registraProduccion ? generarIdLocal() : undefined,
+        idMezcla: hizoMezcla ? generarIdLocal() : undefined,
+        empleadoId,
+        productoId,
+        cantidadProducida: registraProduccion ? cantidadProducida : 0,
+        unidadesDefectuosas: registraProduccion ? unidadesDefectuosas : 0,
+        notas,
+        hizoMezcla,
+        montoMezcla: hizoMezcla ? montoMezcla : 0,
+      });
+      mostrarToast("Registro de producción guardado.");
+      formRef.current?.reset();
+      setEmpleadoId("");
+      setProductoId("");
+      setHizoMezcla(false);
+      setMostrarNotas(false);
+    } catch {
+      setError("No se pudo guardar en este dispositivo. Intenta de nuevo.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <form ref={formRef} onSubmit={alEnviar} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label className="text-xs text-neutral-500">
         ¿Quién trabajó?
         <Combobox
@@ -127,12 +209,7 @@ export function NuevoRegistroProduccionForm({
         )}
       </div>
 
-      <input type="hidden" name="empleadoId" value={empleadoId} />
-      <input type="hidden" name="productoId" value={productoId} />
-
-      {state.error && (
-        <p className="text-sm text-red-600 sm:col-span-2">{state.error}</p>
-      )}
+      {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
 
       <button
         type="submit"

@@ -1,18 +1,35 @@
 "use client";
 
-import { useActionState } from "react";
-import { useToastAccion } from "@/components/admin/ui/Toast";
-import { registrarRiego } from "../actions";
+import { useRef, useState, type FormEvent } from "react";
+import { useToast } from "@/components/admin/ui/Toast";
+import { encolarRiego, generarIdLocal } from "@/lib/offline/sync";
 
 export function RegistrarRiegoForm({ pedidoId }: { pedidoId: string }) {
-  const [state, formAction] = useActionState(
-    registrarRiego.bind(null, pedidoId),
-    {}
-  );
-  useToastAccion(state, "Riego registrado.");
+  const { mostrarToast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function alEnviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setError(null);
+    const formData = new FormData(evento.currentTarget);
+    const observacion = String(formData.get("observacion") || "").trim() || null;
+
+    setPending(true);
+    try {
+      await encolarRiego({ pedidoId, observacion, idRiego: generarIdLocal() });
+      mostrarToast("Riego registrado.");
+      formRef.current?.reset();
+    } catch {
+      setError("No se pudo guardar en este dispositivo. Intenta de nuevo.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-2">
+    <form ref={formRef} onSubmit={alEnviar} className="flex flex-wrap items-end gap-2">
       <label className="flex-1 text-sm text-neutral-700">
         Observación (opcional)
         <input
@@ -22,10 +39,12 @@ export function RegistrarRiegoForm({ pedidoId }: { pedidoId: string }) {
       </label>
       <button
         type="submit"
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+        disabled={pending}
+        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
       >
-        Registrar riego de hoy
+        {pending ? "Guardando…" : "Registrar riego de hoy"}
       </button>
+      {error && <p className="w-full text-sm text-red-600">{error}</p>}
     </form>
   );
 }

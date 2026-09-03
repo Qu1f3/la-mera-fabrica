@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { MONTO_MEZCLA_DEFAULT } from "../constants";
 import { NuevoRegistroProduccionForm } from "./NuevoRegistroProduccionForm";
@@ -34,12 +33,14 @@ export default async function NuevoRegistroProduccionPage() {
 
   return (
     <div className="max-w-2xl">
-      <Link
-        href="/admin/produccion"
-        className="text-sm text-neutral-500 hover:text-neutral-800"
-      >
+      {/* <a> a propósito, no <Link>: esta página y /admin/produccion son
+          rutas sin conexión (ver propuesta-modo-offline.md) -- una
+          navegación de verdad es lo que el service worker sabe
+          interceptar y servir desde caché si no hay señal. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a propósito, ver comentario arriba */}
+      <a href="/admin/produccion" className="text-sm text-neutral-500 hover:text-neutral-800">
         ← Producción
-      </Link>
+      </a>
       <h1 className="mt-2 text-2xl font-semibold text-neutral-900">
         Nuevo registro de producción
       </h1>

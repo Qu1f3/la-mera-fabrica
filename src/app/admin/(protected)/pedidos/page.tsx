@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { EstadoBadge } from "@/components/admin/ui/EstadoBadge";
 import { formatearFechaHoraHonduras, formatearFechaHonduras } from "@/lib/fecha";
@@ -61,12 +60,16 @@ export default async function PedidosPage({
             la cola, por orden de llegada.
           </p>
         </div>
-        <Link
+        {/* <a> normal (no <Link>) -- ruta sin conexión, ver AdminNav.tsx y
+            propuesta-modo-offline.md sobre por qué hace falta una
+            navegación dura para que el service worker la intercepte. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a propósito, ver comentario arriba */}
+        <a
           href="/admin/pedidos/nuevo"
           className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
         >
           + Nuevo pedido
-        </Link>
+        </a>
       </div>
 
       <form className="mt-4 flex flex-wrap gap-2">
@@ -115,12 +118,12 @@ export default async function PedidosPage({
               <tr key={pedido.id} className="hover:bg-neutral-50">
                 <td className="px-4 py-3 text-neutral-400">{indice + 1}</td>
                 <td className="px-4 py-3">
-                  <Link
+                  <a
                     href={`/admin/pedidos/${pedido.id}`}
                     className="font-medium text-neutral-900 hover:underline"
                   >
                     #{pedido.codigo}
-                  </Link>
+                  </a>
                 </td>
                 <td className="px-4 py-3 text-neutral-700">
                   {pedido.cliente.nombre}

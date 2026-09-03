@@ -70,12 +70,17 @@ export default async function ProduccionPage({
               Pago por unidad
             </Link>
           )}
-          <Link
+          {/* <a> a propósito, no <Link>: /admin/produccion/nuevo es una de
+              las rutas sin conexión (ver propuesta-modo-offline.md) -- una
+              navegación de verdad es lo que el service worker sabe
+              interceptar y servir desde caché si no hay señal. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a propósito, ver comentario arriba */}
+          <a
             href="/admin/produccion/nuevo"
             className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
           >
             + Nuevo registro
-          </Link>
+          </a>
         </div>
       </div>
 
