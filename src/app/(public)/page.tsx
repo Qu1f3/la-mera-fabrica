@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import {
   PRODUCTOS_POR_PAGINA,
   listCategoriasActivas,
@@ -84,20 +85,31 @@ export default async function Home({
         </p>
 
         <div className="mt-6">
-          <FilterBar
-            categorias={categorias}
-            estilos={opciones.estilos}
-            acabados={opciones.acabados}
-            aplicaciones={opciones.aplicaciones}
-            valores={{
-              tipo: filtros.tipo,
-              categoria: filtros.categoriaSlug,
-              estilo: filtros.estilo,
-              acabado: filtros.acabado,
-              aplicacion: filtros.aplicacion,
-              q: filtros.q,
-            }}
-          />
+          {/* FilterBar es un Client Component que usa useSearchParams() para
+              filtrar en tiempo real (ver FilterBar.tsx) -- Next.js exige que
+              cualquier componente con useSearchParams() esté dentro de un
+              <Suspense>, aunque acá se resuelve casi al instante porque no
+              depende de ningún dato asíncrono propio. */}
+          <Suspense
+            fallback={
+              <div className="h-[92px] animate-pulse rounded-lg border border-neutral-200 bg-neutral-50" />
+            }
+          >
+            <FilterBar
+              categorias={categorias}
+              estilos={opciones.estilos}
+              acabados={opciones.acabados}
+              aplicaciones={opciones.aplicaciones}
+              valores={{
+                tipo: filtros.tipo,
+                categoria: filtros.categoriaSlug,
+                estilo: filtros.estilo,
+                acabado: filtros.acabado,
+                aplicacion: filtros.aplicacion,
+                q: filtros.q,
+              }}
+            />
+          </Suspense>
         </div>
 
         {productos.length > 0 ? (
