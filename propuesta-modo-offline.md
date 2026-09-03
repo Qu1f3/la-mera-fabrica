@@ -148,3 +148,19 @@ Al probar en un iPhone real (abriendo el ícono de la app instalada y cortando l
 **Corrección:** el scope ahora es `"/admin"` (sin barra), que sí es prefijo de todas las rutas del panel por igual. Se agregó además una limpieza de una sola vez que borra cualquier registración vieja con el scope anterior (`"/admin/"`) antes de registrar la nueva -- si no, un dispositivo que ya tenía la app instalada quedaría con dos service workers activos a la vez para `/admin`, compitiendo por cuál sirve cada pantalla.
 
 **Importante para probar de nuevo:** después de este `git push`, hay que abrir la app UNA VEZ con conexión (para que el dispositivo borre el registro viejo, instale el nuevo, y vuelva a guardar una copia de `/admin`) antes de volver a cortar la señal para probar.
+
+## Segunda corrección post-Fase 4 (3 de septiembre de 2026, mismo día): precarga en `install`
+
+Después de la corrección de scope de arriba, el usuario volvió a probar en su iPhone y en su PC (esta vez con una recarga de verdad bajo DevTools en modo "Offline", no solo viendo una pestaña que ya estaba abierta). Ambas pruebas fallaron, pero de una forma distinta a la vez anterior:
+
+- iPhone: mostró un error, pero esta vez ERA NUESTRO PROPIO mensaje ("Sin conexión y todavía no hay una copia guardada de esta página."), no el error nativo de Safari.
+- PC: la recarga falló con `ERR_FAILED`, y el panel de Red de DevTools mostraba que la petición la había iniciado `sw.js:11` (el propio service worker).
+
+Esto en realidad CONFIRMA que la corrección de scope funcionó: en ambos dispositivos el service worker ya está interceptando `/admin` correctamente. El problema que queda es otro: no había ninguna copia guardada en caché para servir.
+
+**Causa:** el evento `install` del service worker nunca precargaba nada -- solo hacía `self.skipWaiting()`. El cacheo de páginas pasaba únicamente de forma oportunista dentro del `fetch` handler, cuando una navegación con conexión se completaba bien. El problema es que un service worker recién registrado **no controla la navegación que disparó su propio registro**, solo las siguientes -- así que la primera visita con señal después de que el nuevo service worker se instala no queda cacheada por esa misma visita. Hacía falta visitar cada pantalla DOS VECES con conexión (una para que el service worker se registre/active, otra para que ahí sí quede guardada la copia) antes de que sin conexión funcionara -- un detalle fácil de pasar por alto al probar.
+
+**Corrección:** el evento `install` ahora precarga de forma proactiva (con `event.waitUntil`) todas las rutas sin conexión que se conocen de antemano (`RUTAS_SIN_CONEXION` más `/admin/pedidos/nuevo`; el detalle de un pedido, `/admin/pedidos/[id]`, sigue sin precargarse porque es dinámico -- se cachea la primera vez que se visita, como ya pasaba). Cada ruta se pide con `fetch` y, si la respuesta es exitosa, se guarda en `CACHE_PAGINAS`. Si no hay sesión iniciada en ese momento, lo que quedaría precargado es la página de login (no la pantalla real) -- no es grave, la próxima visita real con sesión activa la reemplaza (la rama de "navigate" del `fetch` handler siempre vuelve a guardar la copia más reciente). Si no hay señal justo en el momento de instalar el service worker, cada `fetch` fallido se ignora silenciosamente (try/catch por ruta) -- se cachea igual la próxima vez que se visite esa pantalla con conexión.
+
+**Importante para probar de nuevo:** después de este `git push` y de que Vercel termine de desplegar, hay que abrir la app UNA VEZ con conexión (para que el service worker nuevo se instale y precargue todas las rutas) antes de cortar la señal. Después de esa sola visita, cualquier recarga real sin conexión (F5 en PC bajo DevTools "Offline", o abrir la app desde el ícono en el iPhone en modo avión) debería servir la copia guardada en vez de fallar.
+

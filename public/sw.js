@@ -42,8 +42,47 @@ const VERSION_CACHE = "lmf-v1";
 const CACHE_ESTATICO = `${VERSION_CACHE}-estatico`;
 const CACHE_PAGINAS = `${VERSION_CACHE}-paginas`;
 
-self.addEventListener("install", () => {
+self.addEventListener("install", (event) => {
   self.skipWaiting();
+  // Precarga proactiva de las páginas sin conexión que se conocen de
+  // antemano (todas menos el detalle de un pedido, que es dinámico y no
+  // se puede listar de antemano -- esas se siguen cacheando solo cuando
+  // se visitan de verdad, como hasta ahora).
+  //
+  // Sin esto, la PRIMERA vez que este service worker se instala en un
+  // dispositivo, la página que dispara la instalación (la que el usuario
+  // tiene abierta en ese momento) NO queda cacheada por esa visita -- un
+  // service worker recién instalado no controla la navegación que ya
+  // estaba en curso cuando se registró, solo las siguientes. Eso
+  // significaba que había que visitar cada pantalla DOS VECES con señal
+  // (una para que se registre/active el service worker, otra para que
+  // recién ahí quede guardada la copia) antes de que sin conexión
+  // funcionara -- fácil de no notar y que requiere de bastante explicación.
+  // Con esta precarga, una sola visita con señal alcanza.
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_PAGINAS);
+      const rutasAPrecachear = [...RUTAS_SIN_CONEXION, "/admin/pedidos/nuevo"];
+      await Promise.all(
+        rutasAPrecachear.map(async (ruta) => {
+          try {
+            const respuesta = await fetch(ruta, { credentials: "same-origin" });
+            // Si en este momento no hay sesión iniciada, la ruta redirige a
+            // /admin/login y ESO es lo que quedaría precargado bajo esta
+            // URL -- no es grave, la próxima visita real con sesión activa
+            // lo reemplaza (ver la rama de "navigate" del fetch handler,
+            // más abajo, que siempre vuelve a guardar la copia más
+            // reciente cuando hay señal).
+            if (respuesta.ok) await cache.put(ruta, respuesta);
+          } catch {
+            // Sin señal justo en el momento de instalar el service worker
+            // (raro, pero posible) -- no es grave, se cachea igual la
+            // próxima vez que se visite esa pantalla con conexión.
+          }
+        })
+      );
+    })()
+  );
 });
 
 self.addEventListener("activate", (event) => {
