@@ -136,3 +136,15 @@ La más delicada de las cuatro, porque Pedidos es la única pantalla del alcance
 **Todavía NO probado de verdad** (necesita el navegador real en dos dispositivos a la vez): crear un pedido sin conexión, cambiarle el estado desde OTRO dispositivo mientras el primero sigue sin señal, reconectar el primero y confirmar que aparece el conflicto en `ConflictosPendientes.tsx` con la información correcta, y que tanto "aplicar de todas formas" como "descartar" hacen lo que dicen. Recomiendo probar este escenario de choque real (el más importante de las 4 fases) antes de confiar en esto para el negocio de verdad.
 
 **Con esto quedan completas las 4 pantallas del alcance elegido** (Producción, Extras, Inventario, Pedidos). Lo que sigue -- si se quiere ampliar más adelante -- es el resto del panel (Reportes, Finanzas, Clientes, etc.), que a propósito se dejó fuera desde el principio.
+
+---
+
+## Corrección post-Fase 4 (3 de septiembre de 2026, mismo día): scope del service worker
+
+Al probar en un iPhone real (abriendo el ícono de la app instalada y cortando la señal), la pantalla de inicio (`/admin`) no cargaba -- Safari mostraba su propio error de "no hay conexión" en vez de la copia guardada.
+
+**Causa encontrada:** `RegisterServiceWorker.tsx` registraba el service worker con `scope: "/admin/"` (CON barra al final). El scope de un service worker se compara por prefijo de texto contra la URL completa -- y `"/admin"` (la URL exacta del `start_url` del manifest, la primera pantalla que abre la app instalada, SIN barra) no empieza con `"/admin/"` porque le falta justo esa barra. Esa única pantalla quedaba fuera del alcance del service worker desde la Fase 1 -- nunca la interceptaba, así que sin conexión iba directo a la red (que fallaba) en vez de pasar por `sw.js`. El resto de rutas (`/admin/produccion`, `/admin/pedidos`, etc.) sí tienen la barra siguiente en su propia URL y no se veían afectadas.
+
+**Corrección:** el scope ahora es `"/admin"` (sin barra), que sí es prefijo de todas las rutas del panel por igual. Se agregó además una limpieza de una sola vez que borra cualquier registración vieja con el scope anterior (`"/admin/"`) antes de registrar la nueva -- si no, un dispositivo que ya tenía la app instalada quedaría con dos service workers activos a la vez para `/admin`, compitiendo por cuál sirve cada pantalla.
+
+**Importante para probar de nuevo:** después de este `git push`, hay que abrir la app UNA VEZ con conexión (para que el dispositivo borre el registro viejo, instale el nuevo, y vuelva a guardar una copia de `/admin`) antes de volver a cortar la señal para probar.
