@@ -15,18 +15,67 @@ type ComponenteResumen = {
   notas: string | null;
 };
 
-function Etiqueta({ tono, children }: { tono: "gris" | "ambar"; children: React.ReactNode }) {
-  const clases =
-    tono === "ambar"
-      ? "border-amber-200 bg-amber-50 text-amber-800"
-      : "border-neutral-200 bg-neutral-100 text-neutral-700";
+// Nombres de color en español -> color real, para el puntito junto a
+// "Cemento gris/blanco" y "Colorante {color}" -- ayuda a identificar de un
+// vistazo sin tener que leer el texto completo. Si el nombre no está acá
+// (algo escrito distinto, ej. "rojo ladrillo"), cae a un punto gris neutro
+// en vez de fallar. Pedido por el usuario 2026-09-04: los registros se
+// confundían fácil siendo puramente informativos.
+const COLOR_HEX: Record<string, string> = {
+  gris: "#9ca3af",
+  blanco: "#ffffff",
+  rojo: "#dc2626",
+  negro: "#171717",
+  azul: "#2563eb",
+  verde: "#16a34a",
+  amarillo: "#eab308",
+  cafe: "#78350f",
+  café: "#78350f",
+  marron: "#78350f",
+  marrón: "#78350f",
+  naranja: "#ea580c",
+  rosado: "#ec4899",
+  rosa: "#ec4899",
+  morado: "#7c3aed",
+  violeta: "#7c3aed",
+  celeste: "#38bdf8",
+  turquesa: "#14b8a6",
+  dorado: "#ca8a04",
+};
+
+function colorHex(nombre: string | null): string {
+  if (!nombre) return "#d4d4d4";
+  return COLOR_HEX[nombre.trim().toLowerCase()] ?? "#d4d4d4";
+}
+
+function PuntoColor({ nombre }: { nombre: string | null }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${clases}`}
-    >
-      {children}
-    </span>
+      aria-hidden="true"
+      className="mr-1 inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full border border-black/10 align-[-1px]"
+      style={{ backgroundColor: colorHex(nombre) }}
+    />
   );
+}
+
+// Paleta de respaldo para el avatar de un mosaico sin foto -- un color fijo
+// por producto (elegido a partir de su id, siempre el mismo) para poder
+// distinguir unos de otros aunque no tengan imagen todavía.
+const PALETA_AVATAR = [
+  "bg-rose-100 text-rose-700",
+  "bg-amber-100 text-amber-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-sky-100 text-sky-700",
+  "bg-violet-100 text-violet-700",
+  "bg-orange-100 text-orange-700",
+  "bg-teal-100 text-teal-700",
+  "bg-fuchsia-100 text-fuchsia-700",
+];
+
+function colorAvatar(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return PALETA_AVATAR[hash % PALETA_AVATAR.length];
 }
 
 /**
@@ -39,6 +88,7 @@ function Etiqueta({ tono, children }: { tono: "gris" | "ambar"; children: React.
 function FilaComponente({ componente }: { componente: ComponenteResumen }) {
   const hayCemento = componente.cementoCantidad !== null && componente.cementoCantidad !== undefined;
   const hayColorante = Boolean(componente.coloranteColor);
+  const tipoCemento = componente.cementoTipo === "blanco" ? "blanco" : "gris";
 
   return (
     <div className="rounded-md border border-neutral-100 bg-neutral-50 px-3 py-2">
@@ -46,18 +96,19 @@ function FilaComponente({ componente }: { componente: ComponenteResumen }) {
       {(hayCemento || hayColorante) && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {hayCemento && (
-            <Etiqueta tono="gris">
-              Cemento {componente.cementoTipo === "blanco" ? "blanco" : "gris"} ·{" "}
-              {String(componente.cementoCantidad)} {componente.cementoUnidad}
-            </Etiqueta>
+            <span className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700">
+              <PuntoColor nombre={tipoCemento} />
+              Cemento {tipoCemento} · {String(componente.cementoCantidad)} {componente.cementoUnidad}
+            </span>
           )}
           {hayColorante && (
-            <Etiqueta tono="ambar">
+            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+              <PuntoColor nombre={componente.coloranteColor} />
               Colorante {componente.coloranteColor}
               {componente.coloranteCantidad !== null && componente.coloranteCantidad !== undefined
                 ? ` · ${String(componente.coloranteCantidad)} ${componente.coloranteUnidad}`
                 : " (cantidad variable)"}
-            </Etiqueta>
+            </span>
           )}
         </div>
       )}
@@ -72,11 +123,23 @@ function FilaComponente({ componente }: { componente: ComponenteResumen }) {
  * inventario ni se conecta con Producción, a propósito (ver actions.ts).
  * Visible y editable tanto para ADMIN como EMPLEADO -- decisión explícita
  * del usuario, igual que Producción/Inventario.
+ *
+ * Rediseño 2026-09-04: el usuario reportó que los registros se confundían
+ * fácil entre sí a simple vista. Se agregó la foto del mosaico (o un avatar
+ * con inicial y color fijo si todavía no tiene foto) junto al nombre, y un
+ * puntito de color junto a cada cemento/colorante para reconocer de un
+ * vistazo sin tener que leer el texto completo.
  */
 export default async function CombinacionesPage() {
   const combinaciones = await prisma.combinacionMosaico.findMany({
     include: {
-      producto: { select: { nombre: true, sku: true } },
+      producto: {
+        select: {
+          nombre: true,
+          sku: true,
+          imagenes: { select: { url: true }, orderBy: { orden: "asc" }, take: 1 },
+        },
+      },
       componentes: { orderBy: { orden: "asc" } },
     },
     orderBy: { producto: { nombre: "asc" } },
@@ -101,30 +164,54 @@ export default async function CombinacionesPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-3">
-        {combinaciones.map((combinacion) => (
-          <Link
-            key={combinacion.id}
-            href={`/admin/combinaciones/${combinacion.id}`}
-            className="block rounded-lg border border-neutral-200 bg-white p-4 hover:border-neutral-300 hover:bg-neutral-50"
-          >
-            <p className="font-medium text-neutral-900">
-              {combinacion.producto.nombre}
-              {combinacion.producto.sku && (
-                <span className="ml-1.5 text-xs font-normal text-neutral-400">
-                  ({combinacion.producto.sku})
-                </span>
+        {combinaciones.map((combinacion) => {
+          const imagen = combinacion.producto.imagenes[0];
+          return (
+            <Link
+              key={combinacion.id}
+              href={`/admin/combinaciones/${combinacion.id}`}
+              className="flex gap-3 rounded-lg border border-neutral-200 bg-white p-4 hover:border-neutral-300 hover:bg-neutral-50 hover:shadow-sm"
+            >
+              {imagen ? (
+                // Miniatura chica en una lista -- mismo criterio que Combobox.tsx
+                // (imagen ya optimizada en origen, next/image no aporta nada acá).
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imagen.url}
+                  alt=""
+                  loading="lazy"
+                  className="h-14 w-14 flex-shrink-0 rounded-md border border-neutral-200 object-cover"
+                />
+              ) : (
+                <div
+                  aria-hidden="true"
+                  className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-md text-lg font-semibold ${colorAvatar(combinacion.productoId)}`}
+                >
+                  {combinacion.producto.nombre.trim().slice(0, 1).toUpperCase() || "?"}
+                </div>
               )}
-            </p>
-            <div className="mt-2.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {combinacion.componentes.map((componente) => (
-                <FilaComponente key={componente.id} componente={componente} />
-              ))}
-            </div>
-            {combinacion.notas && (
-              <p className="mt-2 text-xs text-neutral-400">{combinacion.notas}</p>
-            )}
-          </Link>
-        ))}
+
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-neutral-900">
+                  {combinacion.producto.nombre}
+                  {combinacion.producto.sku && (
+                    <span className="ml-1.5 text-xs font-normal text-neutral-400">
+                      ({combinacion.producto.sku})
+                    </span>
+                  )}
+                </p>
+                <div className="mt-2.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {combinacion.componentes.map((componente) => (
+                    <FilaComponente key={componente.id} componente={componente} />
+                  ))}
+                </div>
+                {combinacion.notas && (
+                  <p className="mt-2 text-xs text-neutral-400">{combinacion.notas}</p>
+                )}
+              </div>
+            </Link>
+          );
+        })}
         {combinaciones.length === 0 && (
           <p className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-500">
             Todavía no hay combinaciones registradas.
