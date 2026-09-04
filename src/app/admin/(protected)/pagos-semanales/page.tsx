@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 import { formatearFechaHonduras } from "@/lib/fecha";
@@ -27,9 +28,17 @@ export default async function PagosSemanalesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-neutral-900">
-        Pagos semanales
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-neutral-900">
+          Pagos semanales
+        </h1>
+        <Link
+          href="/admin/pagos-semanales/calendario"
+          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          📅 Ver calendario
+        </Link>
+      </div>
       <p className="mt-1 max-w-2xl text-sm text-neutral-600">
         Suma producción + mezcla + extras de cada empleado en el rango de
         fechas indicado. Total pendiente de pago: L. {totalPendiente.toFixed(2)}
