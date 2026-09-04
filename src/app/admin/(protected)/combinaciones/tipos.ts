@@ -13,6 +13,8 @@ export type ComponenteFormulario = {
   nombre: string;
   cementoCantidad: string;
   cementoUnidad: string;
+  /** "gris" | "blanco" -- el negocio solo trabaja con esos dos. */
+  cementoTipo: string;
   coloranteColor: string;
   coloranteCantidad: string;
   coloranteUnidad: string;
@@ -21,12 +23,21 @@ export type ComponenteFormulario = {
 
 export const UNIDADES_PESO = ["kg", "lb"] as const;
 
+// El negocio SOLO trabaja con estos dos tipos de cemento (aclarado por el
+// usuario 2026-09-03) -- antes el formulario tenía la etiqueta "Cemento
+// gris" fija, como si no existiera el blanco.
+export const TIPOS_CEMENTO = [
+  { valor: "gris", etiqueta: "Gris" },
+  { valor: "blanco", etiqueta: "Blanco" },
+] as const;
+
 export function componenteVacio(key: string): ComponenteFormulario {
   return {
     key,
     nombre: "",
     cementoCantidad: "",
     cementoUnidad: "kg",
+    cementoTipo: "gris",
     coloranteColor: "",
     coloranteCantidad: "",
     coloranteUnidad: "lb",

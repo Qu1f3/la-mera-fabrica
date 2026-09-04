@@ -3,27 +3,67 @@ import { prisma } from "@/lib/prisma";
 
 export const metadata = { title: "Combinaciones de mosaico — Panel administrativo" };
 
-function resumenComponente(c: {
+type ComponenteResumen = {
+  id: string;
   nombre: string;
   cementoCantidad: unknown;
   cementoUnidad: string | null;
+  cementoTipo: string | null;
   coloranteColor: string | null;
   coloranteCantidad: unknown;
   coloranteUnidad: string | null;
-}) {
-  const partes: string[] = [];
-  if (c.cementoCantidad !== null && c.cementoCantidad !== undefined) {
-    partes.push(`cemento ${String(c.cementoCantidad)}${c.cementoUnidad ?? ""}`);
-  }
-  if (c.coloranteColor) {
-    partes.push(
-      c.coloranteCantidad !== null && c.coloranteCantidad !== undefined
-        ? `colorante ${c.coloranteColor} ${String(c.coloranteCantidad)}${c.coloranteUnidad ?? ""}`
-        : `colorante ${c.coloranteColor} (variable)`
-    );
-  }
-  if (partes.length === 0) return c.nombre;
-  return `${c.nombre} (${partes.join(" + ")})`;
+  notas: string | null;
+};
+
+function Etiqueta({ tono, children }: { tono: "gris" | "ambar"; children: React.ReactNode }) {
+  const clases =
+    tono === "ambar"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-neutral-200 bg-neutral-100 text-neutral-700";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${clases}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Una fila por componente (capa) de la combinación, con el cemento y el
+ * colorante como etiquetas -- antes era una sola línea de texto plano tipo
+ * "Fondo Rojo (cemento gris 42.5kg + colorante rojo 6lb); Pringa Negra
+ * (...)" que se leía como un volcado de datos crudo; el usuario pidió que
+ * se viera más cuidado (2026-09-03).
+ */
+function FilaComponente({ componente }: { componente: ComponenteResumen }) {
+  const hayCemento = componente.cementoCantidad !== null && componente.cementoCantidad !== undefined;
+  const hayColorante = Boolean(componente.coloranteColor);
+
+  return (
+    <div className="rounded-md border border-neutral-100 bg-neutral-50 px-3 py-2">
+      <p className="text-sm font-medium text-neutral-800">{componente.nombre}</p>
+      {(hayCemento || hayColorante) && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {hayCemento && (
+            <Etiqueta tono="gris">
+              Cemento {componente.cementoTipo === "blanco" ? "blanco" : "gris"} ·{" "}
+              {String(componente.cementoCantidad)} {componente.cementoUnidad}
+            </Etiqueta>
+          )}
+          {hayColorante && (
+            <Etiqueta tono="ambar">
+              Colorante {componente.coloranteColor}
+              {componente.coloranteCantidad !== null && componente.coloranteCantidad !== undefined
+                ? ` · ${String(componente.coloranteCantidad)} ${componente.coloranteUnidad}`
+                : " (cantidad variable)"}
+            </Etiqueta>
+          )}
+        </div>
+      )}
+      {componente.notas && <p className="mt-1.5 text-xs text-neutral-400">{componente.notas}</p>}
+    </div>
+  );
 }
 
 /**
@@ -75,11 +115,13 @@ export default async function CombinacionesPage() {
                 </span>
               )}
             </p>
-            <p className="mt-1 text-sm text-neutral-600">
-              {combinacion.componentes.map(resumenComponente).join("; ")}
-            </p>
+            <div className="mt-2.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {combinacion.componentes.map((componente) => (
+                <FilaComponente key={componente.id} componente={componente} />
+              ))}
+            </div>
             {combinacion.notas && (
-              <p className="mt-1 text-xs text-neutral-400">{combinacion.notas}</p>
+              <p className="mt-2 text-xs text-neutral-400">{combinacion.notas}</p>
             )}
           </Link>
         ))}

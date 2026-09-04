@@ -12,6 +12,7 @@ type ComponenteEntrada = {
   nombre?: unknown;
   cementoCantidad?: unknown;
   cementoUnidad?: unknown;
+  cementoTipo?: unknown;
   coloranteColor?: unknown;
   coloranteCantidad?: unknown;
   coloranteUnidad?: unknown;
@@ -23,6 +24,7 @@ type ComponenteValidado = {
   nombre: string;
   cementoCantidad: number | null;
   cementoUnidad: string | null;
+  cementoTipo: string | null;
   coloranteColor: string | null;
   coloranteCantidad: number | null;
   coloranteUnidad: string | null;
@@ -65,6 +67,10 @@ function validarComponentes(
 
     let cementoCantidad: number | null = null;
     let cementoUnidad: string | null = null;
+    // El negocio SOLO trabaja con estos dos tipos de cemento (aclarado por
+    // el usuario 2026-09-03) -- cualquier otro valor que llegue (formulario
+    // manipulado a mano, dato viejo) cae a "gris" en vez de fallar.
+    let cementoTipo: string | null = null;
     const cementoTexto = String(c.cementoCantidad ?? "").trim();
     if (cementoTexto !== "") {
       const valor = Number(cementoTexto);
@@ -73,6 +79,7 @@ function validarComponentes(
       }
       cementoCantidad = valor;
       cementoUnidad = String(c.cementoUnidad ?? "").trim() || "kg";
+      cementoTipo = String(c.cementoTipo ?? "").trim().toLowerCase() === "blanco" ? "blanco" : "gris";
     }
 
     const coloranteColor = String(c.coloranteColor ?? "").trim() || null;
@@ -104,6 +111,7 @@ function validarComponentes(
       nombre,
       cementoCantidad,
       cementoUnidad,
+      cementoTipo,
       coloranteColor,
       coloranteCantidad,
       coloranteUnidad,

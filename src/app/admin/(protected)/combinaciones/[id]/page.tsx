@@ -31,6 +31,7 @@ export default async function FichaCombinacionPage({
           nombre: c.nombre,
           cementoCantidad: c.cementoCantidad !== null ? c.cementoCantidad.toString() : "",
           cementoUnidad: c.cementoUnidad ?? "kg",
+          cementoTipo: c.cementoTipo === "blanco" ? "blanco" : "gris",
           coloranteColor: c.coloranteColor ?? "",
           coloranteCantidad: c.coloranteCantidad !== null ? c.coloranteCantidad.toString() : "",
           coloranteUnidad: c.coloranteUnidad ?? "lb",

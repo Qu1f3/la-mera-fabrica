@@ -20,6 +20,7 @@ const RUTAS_EMPLEADO = [
   "/admin/pedidos",
   "/admin/produccion",
   "/admin/combinaciones",
+  "/admin/existencia",
   "/admin/extras",
   "/admin/pagos-semanales",
   "/admin/inventario",
@@ -41,6 +42,7 @@ const GRUPOS_NAV: Grupo[] = [
     enlaces: [
       { href: "/admin/produccion", label: "Producción", icono: "🏭" },
       { href: "/admin/combinaciones", label: "Combinaciones", icono: "🎨" },
+      { href: "/admin/existencia", label: "Existencia", icono: "📋" },
       { href: "/admin/extras", label: "Extras", icono: "➕" },
       { href: "/admin/empleados", label: "Empleados", icono: "👷" },
       { href: "/admin/pagos-semanales", label: "Pagos semanales", icono: "💵" },

@@ -110,6 +110,12 @@ model Producto {
   // practica (la UI solo deja elegir productos de ese tipo al crear una),
   // pero no se restringe a nivel de schema.
   combinacionMosaico  CombinacionMosaico?
+  // Existencia actual en bodega -- pedido por el usuario 2026-09-04, a
+  // proposito INDEPENDIENTE de RegistroProduccion/MovimientoInventario: es
+  // solo un numero que se actualiza a mano cuando se hace un conteo fisico,
+  // nada lo suma ni lo resta automaticamente. Solo aplica a MOSAICO en la
+  // practica (misma convencion que combinacionMosaico arriba).
+  existenciaMosaico   ExistenciaMosaico?
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -814,7 +820,10 @@ model CombinacionMosaico {
 // "Blanco"). cementoCantidad/coloranteCantidad quedan en null cuando no hay
 // una cantidad exacta (ej: el cemento base ya es del color de fondo, o "depende
 // del empleado") -- en ese caso `notas` explica el motivo en vez de forzar un
-// numero inventado.
+// numero inventado. cementoTipo solo tiene sentido cuando hay cementoCantidad
+// -- el negocio SOLO trabaja con dos tipos de cemento, "gris" y "blanco"
+// (aclarado por el usuario 2026-09-03, antes el formulario asumia gris
+// siempre).
 model ComponenteCombinacion {
   id                String             @id @default(cuid())
   combinacionId     String
@@ -823,6 +832,7 @@ model ComponenteCombinacion {
   nombre            String
   cementoCantidad   Decimal?           @db.Decimal(10, 2)
   cementoUnidad     String?
+  cementoTipo       String?
   coloranteColor    String?
   coloranteCantidad Decimal?           @db.Decimal(10, 2)
   coloranteUnidad   String?
@@ -830,4 +840,20 @@ model ComponenteCombinacion {
 
   @@index([combinacionId])
   @@map("componentes_combinacion")
+}
+
+// Cuanto hay en bodega de cada mosaico terminado. A proposito NO se conecta
+// con RegistroProduccion, MovimientoInventario ni ningun otro registro --
+// pedido explicito del usuario (2026-09-04): es un numero que se actualiza a
+// mano cuando se hace un conteo fisico, nada lo descuenta ni lo suma solo.
+model ExistenciaMosaico {
+  id            String   @id @default(cuid())
+  productoId    String   @unique
+  producto      Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  cantidad      Int      @default(0)
+  notas         String?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@map("existencias_mosaico")
 }

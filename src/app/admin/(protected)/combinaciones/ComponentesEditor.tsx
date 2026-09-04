@@ -1,6 +1,6 @@
 "use client";
 
-import { componenteVacio, UNIDADES_PESO, type ComponenteFormulario } from "./tipos";
+import { componenteVacio, TIPOS_CEMENTO, UNIDADES_PESO, type ComponenteFormulario } from "./tipos";
 
 const inputClass =
   "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-500 focus:outline-none";
@@ -71,16 +71,30 @@ export function ComponentesEditor({
               />
             </label>
 
-            <div className="grid grid-cols-1 gap-3 rounded-md bg-neutral-50 p-2.5 sm:grid-cols-[1fr_auto]">
+            <div className="grid grid-cols-1 gap-3 rounded-md bg-neutral-50 p-2.5 sm:grid-cols-[1fr_1fr_auto]">
               <label className="text-xs text-neutral-500">
-                Cemento gris
+                Cemento -- tipo
+                <select
+                  value={componente.cementoTipo}
+                  onChange={(e) => actualizar(componente.key, { cementoTipo: e.target.value })}
+                  className={`${selectClass} mt-1`}
+                >
+                  {TIPOS_CEMENTO.map((t) => (
+                    <option key={t.valor} value={t.valor}>
+                      {t.etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-neutral-500">
+                Cantidad
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={componente.cementoCantidad}
                   onChange={(e) => actualizar(componente.key, { cementoCantidad: e.target.value })}
-                  placeholder="Cantidad (déjalo vacío si no hay una exacta)"
+                  placeholder="Déjalo vacío si no hay una exacta"
                   className={`${inputClass} mt-1`}
                 />
               </label>
