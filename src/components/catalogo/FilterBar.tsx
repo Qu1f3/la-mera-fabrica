@@ -56,6 +56,13 @@ export function FilterBar({
   const [estilo, setEstilo] = useState(valores.estilo ?? "");
   const [acabado, setAcabado] = useState(valores.acabado ?? "");
   const [aplicacion, setAplicacion] = useState(valores.aplicacion ?? "");
+  // Si el campo de "Buscar" tiene el foco ahora mismo -- ver por qué más
+  // abajo, junto a donde se usa. Es useState (no una ref) a propósito: el
+  // linter de este repo (react-hooks/refs, parte de las reglas del React
+  // Compiler) no deja leer `ref.current` durante el render, y este valor
+  // sí se lee ahí (en el bloque de "ajustar estado durante el render" de
+  // abajo).
+  const [buscandoConFoco, setBuscandoConFoco] = useState(false);
 
   // Si los filtros aplicados de verdad cambian por fuera de esta misma
   // interacción (ej: el botón "atrás" del navegador, o alguien pega un
@@ -77,7 +84,16 @@ export function FilterBar({
   const [claveReflejada, setClaveReflejada] = useState(claveValores);
   if (claveValores !== claveReflejada) {
     setClaveReflejada(claveValores);
-    setTexto(valores.q ?? "");
+    // El campo de texto es el único con debounce + ida y vuelta al
+    // servidor -- si la persona ya escribió/borró más desde que se mandó
+    // ese pedido, la respuesta puede llegar tarde y "revivir" en la caja
+    // un texto que ya había borrado (era el bug reportado: costaba borrar
+    // porque el texto volvía solo). Por eso no se toca mientras el campo
+    // tiene el foco; los selects no tienen esa carrera (un clic es una
+    // sola acción) así que sí se sincronizan siempre.
+    if (!buscandoConFoco) {
+      setTexto(valores.q ?? "");
+    }
     setTipo(valores.tipo ?? "");
     setCategoria(valores.categoria ?? "");
     setEstilo(valores.estilo ?? "");
@@ -145,6 +161,8 @@ export function FilterBar({
           type="search"
           value={texto}
           onChange={(e) => alCambiarTexto(e.target.value)}
+          onFocus={() => setBuscandoConFoco(true)}
+          onBlur={() => setBuscandoConFoco(false)}
           placeholder="Nombre o código"
           className={selectClass}
         />
