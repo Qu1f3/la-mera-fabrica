@@ -90,6 +90,24 @@ function Tarjeta({
 // profundidad, y solo se etiqueta el mes más reciente (no cada barra) para
 // no saturar el gráfico.
 
+// Meses que se excluyen de los comparativos y tendencias de Reportes --
+// datos incompletos que inflarían la utilidad y romperían la gráfica.
+// agosto 2026: solo se registraron los ingresos (pedidos) de ese mes, no
+// los gastos, así que quedaba con gastos L. 0 y utilidad artificialmente
+// alta en la tendencia de 6 meses (usuario, 2026-09-04).
+const MESES_EXCLUIDOS_REPORTES = ["2026-08"];
+
+/** Como mesAdyacente, pero saltando cualquier mes en MESES_EXCLUIDOS_REPORTES. */
+function mesAdyacenteValido(mesTexto: string, delta: 1 | -1): string {
+  let cursor = mesAdyacente(mesTexto, delta);
+  // Tope de seguridad por si la lista de excluidos llegara a encadenar
+  // varios meses seguidos -- nunca debería iterar cerca de esto hoy.
+  for (let i = 0; i < 24 && MESES_EXCLUIDOS_REPORTES.includes(cursor); i++) {
+    cursor = mesAdyacente(cursor, delta);
+  }
+  return cursor;
+}
+
 type MesTendencia = {
   clave: string;
   etiqueta: string;
@@ -524,10 +542,16 @@ export default async function ReportesPage({
 }) {
   const { mes } = await searchParams;
   const mesValido = mes && /^\d{4}-\d{2}$/.test(mes);
-  const mesActual = mesValido ? mes! : claveDiaHonduras(new Date()).slice(0, 7);
+  const mesSolicitado = mesValido ? mes! : claveDiaHonduras(new Date()).slice(0, 7);
+  // Un enlace viejo o un mes escrito a mano en la URL puede apuntar a un
+  // mes excluido -- se cae al mes válido más cercano hacia atrás en vez de
+  // mostrar el resumen incompleto.
+  const mesActual = MESES_EXCLUIDOS_REPORTES.includes(mesSolicitado)
+    ? mesAdyacenteValido(mesSolicitado, -1)
+    : mesSolicitado;
   const { inicio, fin } = rangoMesHonduras(mesActual);
-  const mesAnterior = mesAdyacente(mesActual, -1);
-  const mesSiguiente = mesAdyacente(mesActual, 1);
+  const mesAnterior = mesAdyacenteValido(mesActual, -1);
+  const mesSiguiente = mesAdyacenteValido(mesActual, 1);
   const mesDeHoy = claveDiaHonduras(new Date()).slice(0, 7);
 
   // Últimos 6 meses (incluye el actual) para las tendencias de Finanzas.
@@ -536,7 +560,7 @@ export default async function ReportesPage({
     let cursor = mesActual;
     for (let i = 0; i < 6; i++) {
       meses6.unshift(cursor);
-      cursor = mesAdyacente(cursor, -1);
+      cursor = mesAdyacenteValido(cursor, -1);
     }
   }
   const inicioTendencia = rangoMesHonduras(meses6[0]).inicio;
@@ -546,6 +570,8 @@ export default async function ReportesPage({
     gastosTendencia,
     pedidosNuevos,
     pedidosEntregados,
+    pedidosDelMesConCliente,
+    itemsDelMesConProducto,
     registrosProduccion,
     registrosMezcla,
     pagosSemana,
@@ -569,6 +595,19 @@ export default async function ReportesPage({
       where: { fechaEntregaReal: { gte: inicio, lt: fin } },
       _sum: { montoTotal: true },
       _count: true,
+    }),
+    // Para "Top clientes" -- mismo rango que pedidosNuevos (creadoEn), pero
+    // con el nombre del cliente para agrupar en JS abajo (igual que
+    // ingresosPorCategoria/gastosPorCategoria).
+    prisma.pedido.findMany({
+      where: { creadoEn: { gte: inicio, lt: fin } },
+      select: { clienteId: true, montoTotal: true, cliente: { select: { nombre: true } } },
+    }),
+    // Para "Top productos" -- items de pedidos creados este mes, con el
+    // nombre del producto.
+    prisma.itemPedido.findMany({
+      where: { pedido: { creadoEn: { gte: inicio, lt: fin } } },
+      select: { productoId: true, cantidad: true, subtotal: true, producto: { select: { nombre: true } } },
     }),
     prisma.registroProduccion.aggregate({
       where: { fecha: { gte: inicio, lt: fin } },
@@ -645,6 +684,46 @@ export default async function ReportesPage({
       .sort((a, b) => b.monto - a.monto);
   })();
 
+  // Top 5 clientes del mes por monto comprado (entre paréntesis, cuántos
+  // pedidos hizo).
+  const topClientes: CategoriaMonto[] = (() => {
+    const mapa = new Map<string, { nombre: string; monto: number; pedidos: number }>();
+    for (const p of pedidosDelMesConCliente) {
+      const actual = mapa.get(p.clienteId) ?? { nombre: p.cliente.nombre, monto: 0, pedidos: 0 };
+      actual.monto += Number(p.montoTotal);
+      actual.pedidos += 1;
+      mapa.set(p.clienteId, actual);
+    }
+    return Array.from(mapa.entries())
+      .map(([clienteId, d]) => ({
+        clave: clienteId,
+        etiqueta: `${d.nombre} (${d.pedidos})`,
+        monto: d.monto,
+      }))
+      .sort((a, b) => b.monto - a.monto)
+      .slice(0, 5);
+  })();
+
+  // Top 5 productos del mes por monto vendido (entre paréntesis, cuántas
+  // unidades).
+  const topProductos: CategoriaMonto[] = (() => {
+    const mapa = new Map<string, { nombre: string; monto: number; cantidad: number }>();
+    for (const item of itemsDelMesConProducto) {
+      const actual = mapa.get(item.productoId) ?? { nombre: item.producto.nombre, monto: 0, cantidad: 0 };
+      actual.monto += Number(item.subtotal);
+      actual.cantidad += Number(item.cantidad);
+      mapa.set(item.productoId, actual);
+    }
+    return Array.from(mapa.entries())
+      .map(([productoId, d]) => ({
+        clave: productoId,
+        etiqueta: `${d.nombre} (${d.cantidad})`,
+        monto: d.monto,
+      }))
+      .sort((a, b) => b.monto - a.monto)
+      .slice(0, 5);
+  })();
+
   const pagadoEmpleados = pagosSemana
     .filter((p) => p.estado === "PAGADO")
     .reduce((suma, p) => suma + Number(p.totalGanado), 0);
@@ -688,6 +767,10 @@ export default async function ReportesPage({
       <p className="mt-1 max-w-2xl text-sm text-neutral-500">
         Junta los números que ya se registran en Finanzas, Producción, Pagos semanales e
         Inventario. Para el detalle línea por línea, entra al módulo correspondiente.
+      </p>
+      <p className="mt-1 max-w-2xl text-xs text-neutral-400">
+        Agosto 2026 no se incluye en los comparativos ni en la tendencia de 6 meses: ese mes solo
+        se registraron los ingresos, faltan los gastos.
       </p>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -771,13 +854,43 @@ export default async function ReportesPage({
             )}
           </div>
         </div>
+        <div
+          className="reportes-aparece rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+          style={{ animationDelay: "320ms" }}
+        >
+          <h2 className="text-sm font-semibold text-neutral-900">
+            Top clientes — {nombreMes(mesActual)}
+          </h2>
+          <div className="mt-3">
+            {topClientes.length > 0 ? (
+              <GraficoCategorias datos={topClientes} color={COLOR_VENTAS} idSufijo="top-clientes" />
+            ) : (
+              <p className="text-sm text-neutral-500">Sin pedidos registrados este mes.</p>
+            )}
+          </div>
+        </div>
+        <div
+          className="reportes-aparece rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+          style={{ animationDelay: "360ms" }}
+        >
+          <h2 className="text-sm font-semibold text-neutral-900">
+            Top productos — {nombreMes(mesActual)}
+          </h2>
+          <div className="mt-3">
+            {topProductos.length > 0 ? (
+              <GraficoCategorias datos={topProductos} color={COLOR_PRODUCCION} idSufijo="top-productos" />
+            ) : (
+              <p className="text-sm text-neutral-500">Sin productos vendidos este mes.</p>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Tarjeta
           titulo="Ventas (pedidos)"
           color={COLOR_VENTAS}
-          retraso={320}
+          retraso={400}
           filas={[
             {
               etiqueta: "Pedidos nuevos",
@@ -792,7 +905,7 @@ export default async function ReportesPage({
         <Tarjeta
           titulo="Producción"
           color={COLOR_PRODUCCION}
-          retraso={360}
+          retraso={440}
           filas={[
             {
               etiqueta: "Piezas producidas",
@@ -811,7 +924,7 @@ export default async function ReportesPage({
         <Tarjeta
           titulo="Pagos a empleados"
           color={COLOR_PAGOS}
-          retraso={400}
+          retraso={480}
           filas={[
             { etiqueta: "Pagado", valor: `L. ${pagadoEmpleados.toFixed(2)}` },
             { etiqueta: "Pendiente", valor: `L. ${pendienteEmpleados.toFixed(2)}` },
@@ -820,7 +933,7 @@ export default async function ReportesPage({
         <Tarjeta
           titulo="Inventario"
           color={COLOR_INVENTARIO}
-          retraso={440}
+          retraso={520}
           filas={[
             {
               etiqueta: "Gastado en compras",
